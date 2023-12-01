@@ -86,6 +86,7 @@ void setup() {
   //initialise state variables
   state=0;
   angle=0;
+  home=0;
   calibrated=1;
   microCalib=1;
   failSafeFlag=0;
@@ -97,55 +98,51 @@ void setup() {
 //function for homing the rotor
 void homeRotor()  {
   Serial.println("Homing..");
-  myStepper.moveTo(home);
-  while(myStepper.distanceToGo() != 0)  {
-    myStepper.run();
-    delayMicroseconds(10);
-  }
+  setRotor(0);
   return;
 }
 
 //function for moving the rotor to given angle. 
 //WARNING. This stops everything else from running
 void setRotor(int a)  {
-  Serial.print("\nMoving to angle : ");
-  Serial.println(a);
-  myStepper.moveTo(a);
-  while(myStepper.distanceToGo() != 0)  {
-    myStepper.run();
-    delayMicroseconds(10);
-  }
+  steps = posPerRev * a * gearRatio/360.0;
+  steps = steps + home;
+  myStepper.moveTo(steps);
+  while(myStepper.distanceToGo() != 0)  myStepper.run();
   return;
 }
 
 //function to perform a complete calibration of the rotor
 //this set's a new value to the home 
 void calibrateRotor() 
-{
+{ 
+  calibrated=0;
+  homeRotor();
   Serial.println ("\nCalibrating Rotor");
   myStepper.move(posPerRev * calibRevs * gearRatio);
   int endStopRead = digitalRead(endStop);
-  while(endStopRead==0 && myStepper.distanceToGo() != 0)  {
+  while(myStepper.distanceToGo() != 0)  {
     myStepper.run();
-    delayMicroseconds(10);
-    endStopRead = digitalRead(endStop);
+    delayMicroseconds(5);
+    if (digitalRead(endStop)) {
+      endStopRead = 1;
+      home = myStepper.currentPosition()-100; //if home is found
+      calibrated=1;
+      myStepper.stop();
+    }
   }
-  if (endStopRead==1)  {   //if home is found,
-    home = myStepper.currentPosition(); //update new home position       
+  if (calibrated)  {   //if home is found,
     Serial.print ("\nRotor Calibration Successful!\nHome found at ");
     Serial.println (home);
-    calibrated=1;
     microCalib=1;
   }
   else  {
-    failSafeFlag=1;  
+    state=10;
     Serial.println ("Rotor Calibration Failed");
   }
   //send rotor back to angle before calibration
-
-  //setRotor(angle);
-
-  myStepper.moveTo(home); //to cancel any residual movements
+  setRotor(angle);
+  //myStepper.moveTo(home); //to cancel any residual movements
   return;
 }
 
@@ -167,6 +164,7 @@ void sweepRotor(int direction=1, int sweep=20)
 //function for a quick re-calibaration through small sweeps
 void microCalibrateRotor()
 {
+  homeRotor();
   int centre = myStepper.currentPosition();
   Serial.println("micro-calibrating ..");
   Serial.println("forward sweeping..");
@@ -262,93 +260,68 @@ void loop()
 void loop() 
 { 
   CanBusData_asukiaaa::Frame frame;
-  //machine states:-   0: OFF   1: ON   2: Unclamped    3: Clamped    4: Clamped    5: Update Angle   6:Stepper Run  
-  //INPUT EVENT
-  if (can.available()) {            //if there is a new message event    
-    can.receive(&frame);
-    state = frame.data[stateID];
-    }
+  //machine states:-   -1: FailSafe   0: OFF   1: ON   2: Unclamped    3: Clamped    4: Clamped    5: Update Angle   6:Stepper Run   10: MasterSynch
   switch(state) {
-      case 0:
-      Serial.println("Device Off..");
-      digitalWrite(enPin, HIGH);
+    case 10:         //if there is a new message event
+      can.receive(&frame);
+      state = frame.data[stateID];
+      //Serial.print("\nnew state is ");
+      //Serial.println(state);
+      angle = frame.data[5]+frame.data[4];
+      steps = posPerRev * angle * gearRatio/360.0;
+      steps = steps + home;
+      break;
+    
+    case -1:
+      failSafe();
       while (!can.available());//until there is a new message event
+      state = 10;
       break;
 
-      case 1:
+    case 0:
+      Serial.println("Device Off..");
+      digitalWrite(enPin, HIGH);
+      digitalWrite(endStopVcc, LOW);
+      while (!can.available());//until there is a new message event
+      state = 10;
+      break;
+
+    case 1:
       Serial.println("Device On..");
       digitalWrite(enPin, LOW);
       digitalWrite(endStopVcc, HIGH);
       delay(onTime); //let it fall through to unclamped state
       state = 2;
 
-      case 2:
+    case 2:
       Serial.println("Clamp is disengaged..");
       while (!can.available());//until there is a new message event
+      state = 10;
       break;
 
-      case 3:
+    case 3:
       microCalibrateRotor();
       while (!can.available());//until there is a new message event
+      state = 10;
       break;
 
-      case 4:
+    case 4:
       Serial.println("Clamp is engaged..");
       delay(clampTime);
       while (!can.available());//until there is a new message event
+      state = 10;
       break;
 
-      case 5:
-      angle = frame.data[5]+frame.data[4];
-      steps = posPerRev * angle * gearRatio/360.0;
-      steps = steps + home;
+    case 5:
       myStepper.moveTo(steps);
       Serial.print("\nSetting target angle to : ");
       Serial.println(angle);
       state=6;
 
-      case 6:
-      myStepper.run();
+    case 6:
+      while (!can.available()) myStepper.run();
+      state = 10;
+      break;
 
     }
 }
-  
-/*
-    angle = frame.data[5]+frame.data[4];
-    steps = posPerRev * angle * gearRatio/360.0;
-    steps = steps + home;
-
-    //CALIBRATION STATE
-    if (frame.data[0]==1) microCalibrateRotor(); //if master requested calibration 
-
-    //UPDATE ROTOR ANGLE STATE
-    else if (calibrated==1) {       //if already calibrated and it's not a calibration request,
-      Serial.print("\nSetting Angle to: ");
-      Serial.println(angle);
-      myStepper.moveTo(steps);      //updates the target rotor position for run() command
-      inMotion=1;
-      //microcalibrate everytime we are at 0 degree,
-      //if it was not a calibration request
-      if(angle==0)  microCalib=0;
-    }
-  }
-
-  //report completed motion
-  if (myStepper.distanceToGo() == 0 && inMotion) 
-    { 
-      Serial.print("\nmoved to ");
-      Serial.println(angle);
-      inMotion=0;
-    }
-
-  //microcalibrate everytime we are at 0 degree,
-  if (myStepper.currentPosition() == home && microCalib == 0) 
-    {
-      Serial.println("At zero.\nInterrupting for micro calibration..");
-      microCalibrateRotor();
-      //making sure that we don't miss the command received right after 0
-      if (angle) myStepper.moveTo(angle);
-    }
-	// Move the motor one step. This needs to be called repeatedly, in main loop, for continuous stepper motion.
-	myStepper.run(); 
-}*/
