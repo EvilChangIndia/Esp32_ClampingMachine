@@ -217,20 +217,12 @@ void loop()
   CanBusData_asukiaaa::Frame frame;
   //machine states:-   -2: MasterSynch    -1: FailSafe   0: OFF   1: ON   2: Unclamped    3: Clamped    4: Clamped    5: Update Angle   6:Stepper Run   
   switch(state) {
-    case -2:  //Synchronization state
-      can.receive(&frame);
-      state = frame.data[stateID];
-      //Serial.print("\nnew state is ");
-      //Serial.println(state);
-      angle = frame.data[angleAID]+frame.data[angleBID];
-      steps = posPerRev * angle * gearRatio/360.0;
-      steps = steps + home;
-      break;
-    
     case -1:  //Failsafe
       failSafe();
       while (!can.available());//until there is a new message event
-      state = -2;
+      can.receive(&frame);
+      state = frame.data[stateID];
+      angle = frame.data[angleAID]+frame.data[angleBID];
       break;
 
     case 0: //OFF state
@@ -238,7 +230,9 @@ void loop()
       digitalWrite(enPin, HIGH);
       digitalWrite(endStopVcc, LOW);
       while (!can.available());//until there is a new message event
-      state = -2;
+      can.receive(&frame);
+      state = frame.data[stateID];
+      angle = frame.data[angleAID]+frame.data[angleBID];
       break;
 
     case 1: //ON state
@@ -251,23 +245,31 @@ void loop()
     case 2: //Un-clamped state
       Serial.println("Clamp is disengaged..");
       while (!can.available());//until there is a new message event
-      state = -2;
+      can.receive(&frame);
+      state = frame.data[stateID];
+      angle = frame.data[angleAID]+frame.data[angleBID];
       break;
 
     case 3: //Calibration State
       microCalibrateRotor();
       while (!can.available());//until there is a new message event
-      state = -2;
+      can.receive(&frame);
+      state = frame.data[stateID];
+      angle = frame.data[angleAID]+frame.data[angleBID];
       break;
 
     case 4: //Clamped state
       Serial.println("Clamp is engaged..");
       delay(clampTime);
       while (!can.available());//until there is a new message event
-      state = -2;
+      can.receive(&frame);
+      state = frame.data[stateID];
+      angle = frame.data[angleAID]+frame.data[angleBID];
       break;
 
     case 5: //Update angle
+      steps = posPerRev * angle * gearRatio/360.0;
+      steps = steps + home;
       myStepper.moveTo(steps);
       Serial.print("\nSetting target angle to : ");
       Serial.println(angle);
@@ -275,8 +277,10 @@ void loop()
 
     case 6: //Stepper-rotation state
       while (!can.available()) myStepper.run();
-      state = -2;
+      can.receive(&frame);
+      state = frame.data[stateID];
+      angle = frame.data[angleAID]+frame.data[angleBID];
       break;
-
     }
+  //end of main loop
 }
