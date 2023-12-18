@@ -1,0 +1,366 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Generated with glade 3.40.0 -->
+<interface>
+  <requires lib="gtk+" version="3.24"/>
+  <object class="GtkWindow" id="clampWindow">
+    <property name="width-request">800</property>
+    <property name="height-request">480</property>
+    <property name="can-focus">False</property>
+    <property name="window-position">center-always</property>
+    <signal name="destroy" handler="onDestroyClamp" swapped="no"/>
+    <child>
+      <object class="GtkFixed">
+        <property name="visible">True</property>
+        <property name="can-focus">False</property>
+        <signal name="destroy" handler="onDestroyClamp" swapped="no"/>
+        <child>
+          <object class="GtkButton" id="failSafeButton3">
+            <property name="label" translatable="yes">FAILSAFE</property>
+            <property name="width-request">220</property>
+            <property name="height-request">120</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+          </object>
+          <packing>
+            <property name="y">360</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkTextView" id="statusBox3">
+            <property name="width-request">650</property>
+            <property name="height-request">60</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkTextView" id="timeBox3">
+            <property name="width-request">140</property>
+            <property name="height-request">60</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+          </object>
+          <packing>
+            <property name="x">660</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="unClampButton">
+            <property name="label" translatable="yes">UN-CLAMP</property>
+            <property name="width-request">200</property>
+            <property name="height-request">180</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+            <property name="image-position">right</property>
+            <signal name="released" handler="onButtonPressUnclamp" swapped="no"/>
+          </object>
+          <packing>
+            <property name="x">597</property>
+            <property name="y">79</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="calibrateButton2">
+            <property name="label" translatable="yes">CALIBRATE</property>
+            <property name="width-request">200</property>
+            <property name="height-request">180</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+          </object>
+          <packing>
+            <property name="x">600</property>
+            <property name="y">300</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="cwButton">
+            <property name="label" translatable="yes">+ 90 degree</property>
+            <property name="width-request">300</property>
+            <property name="height-request">115</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+          </object>
+          <packing>
+            <property name="x">239</property>
+            <property name="y">80</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="acwButton">
+            <property name="label" translatable="yes">- 90 degree</property>
+            <property name="width-request">300</property>
+            <property name="height-request">115</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+          </object>
+          <packing>
+            <property name="x">239</property>
+            <property name="y">351</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="homeButton">
+            <property name="label" translatable="yes">HOME</property>
+            <property name="width-request">300</property>
+            <property name="height-request">115</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+          </object>
+          <packing>
+            <property name="x">238</property>
+            <property name="y">218</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkTextView" id="infoBox3">
+            <property name="width-request">220</property>
+            <property name="height-request">255</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+          </object>
+          <packing>
+            <property name="y">79</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+  </object>
+  <object class="GtkWindow" id="exitWindow">
+    <property name="width-request">800</property>
+    <property name="height-request">480</property>
+    <property name="can-focus">False</property>
+    <signal name="destroy" handler="onDestroyExit" swapped="no"/>
+    <child>
+      <object class="GtkFixed">
+        <property name="visible">True</property>
+        <property name="can-focus">False</property>
+        <child>
+          <object class="GtkButton" id="powerButton">
+            <property name="label" translatable="yes">Power Off</property>
+            <property name="width-request">300</property>
+            <property name="height-request">150</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+            <signal name="released" handler="onButtonPressPower" swapped="no"/>
+          </object>
+          <packing>
+            <property name="x">80</property>
+            <property name="y">161</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="restartButton">
+            <property name="label" translatable="yes">Restart</property>
+            <property name="width-request">300</property>
+            <property name="height-request">150</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+            <signal name="released" handler="onButtonPressRestart" swapped="no"/>
+          </object>
+          <packing>
+            <property name="x">419</property>
+            <property name="y">164</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="backButton">
+            <property name="label" translatable="yes">BACK</property>
+            <property name="width-request">220</property>
+            <property name="height-request">120</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+            <signal name="released" handler="onButtonPressBack" swapped="no"/>
+          </object>
+          <packing>
+            <property name="y">360</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+  </object>
+  <object class="GtkWindow" id="offWindow">
+    <property name="width-request">800</property>
+    <property name="height-request">480</property>
+    <property name="can-focus">False</property>
+    <signal name="destroy" handler="onDestroyOff" swapped="no"/>
+    <child>
+      <object class="GtkFixed">
+        <property name="visible">True</property>
+        <property name="can-focus">False</property>
+        <property name="resize-mode">immediate</property>
+        <child>
+          <object class="GtkButton" id="exitButton">
+            <property name="label" translatable="yes">EXIT</property>
+            <property name="width-request">220</property>
+            <property name="height-request">120</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+            <property name="resize-mode">immediate</property>
+            <signal name="released" handler="onButtonPressExit" swapped="no"/>
+          </object>
+          <packing>
+            <property name="y">360</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkTextView" id="statusBox0">
+            <property name="width-request">650</property>
+            <property name="height-request">60</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="resize-mode">immediate</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkTextView" id="timeBox0">
+            <property name="width-request">140</property>
+            <property name="height-request">60</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="resize-mode">immediate</property>
+          </object>
+          <packing>
+            <property name="x">660</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="onButton">
+            <property name="label" translatable="yes">ON</property>
+            <property name="width-request">225</property>
+            <property name="height-request">400</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+            <property name="resize-mode">immediate</property>
+            <signal name="released" handler="onButtonPressON" swapped="no"/>
+          </object>
+          <packing>
+            <property name="x">575</property>
+            <property name="y">80</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkTextView" id="infoBox0">
+            <property name="width-request">556</property>
+            <property name="height-request">261</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="resize-mode">immediate</property>
+          </object>
+          <packing>
+            <property name="y">79</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+  </object>
+  <object class="GtkWindow" id="onWindow">
+    <property name="width-request">800</property>
+    <property name="height-request">480</property>
+    <property name="can-focus">False</property>
+    <signal name="destroy" handler="onDestroyOn" swapped="no"/>
+    <child>
+      <object class="GtkFixed">
+        <property name="visible">True</property>
+        <property name="can-focus">False</property>
+        <child>
+          <object class="GtkTextView" id="statusBox1">
+            <property name="width-request">650</property>
+            <property name="height-request">60</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+          </object>
+        </child>
+        <child>
+          <object class="GtkTextView" id="timeBox1">
+            <property name="width-request">140</property>
+            <property name="height-request">60</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+          </object>
+          <packing>
+            <property name="x">663</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="offButton">
+            <property name="label" translatable="yes">OFF</property>
+            <property name="width-request">300</property>
+            <property name="height-request">190</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+            <signal name="released" handler="onButtonPressOff" swapped="no"/>
+          </object>
+          <packing>
+            <property name="x">503</property>
+            <property name="y">86</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="calibrateButton1">
+            <property name="label" translatable="yes">CALIBRATE</property>
+            <property name="width-request">300</property>
+            <property name="height-request">180</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+          </object>
+          <packing>
+            <property name="x">503</property>
+            <property name="y">300</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="clampButton">
+            <property name="label" translatable="yes">CLAMP</property>
+            <property name="width-request">200</property>
+            <property name="height-request">390</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+            <signal name="released" handler="onButtonPressClamp" swapped="no"/>
+          </object>
+          <packing>
+            <property name="x">283</property>
+            <property name="y">90</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkTextView" id="infoBox1">
+            <property name="width-request">260</property>
+            <property name="height-request">245</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+          </object>
+          <packing>
+            <property name="y">94</property>
+          </packing>
+        </child>
+        <child>
+          <object class="GtkButton" id="failSafeButton2">
+            <property name="label" translatable="yes">FAILSAFE</property>
+            <property name="width-request">260</property>
+            <property name="height-request">120</property>
+            <property name="visible">True</property>
+            <property name="can-focus">True</property>
+            <property name="receives-default">True</property>
+          </object>
+          <packing>
+            <property name="y">360</property>
+          </packing>
+        </child>
+      </object>
+    </child>
+  </object>
+</interface>
