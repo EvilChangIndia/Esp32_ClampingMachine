@@ -13,7 +13,7 @@ static const auto QUARTZ_FREQUENCY =
     CanBusMCP2515_asukiaaa::QuartzFrequency::MHz8;
 static const auto BITRATE = CanBusMCP2515_asukiaaa::BitRate::Kbps125;
 #ifndef CAN_ID
-#define CAN_ID 3000
+#define CAN_ID 2000
 #endif
 
 CanBusMCP2515_asukiaaa::Driver can(PIN_CS, PIN_INT, PIN_RST);
@@ -43,7 +43,7 @@ void loop() {
     CanBusData_asukiaaa::Frame frame;
     frame.id = CAN_ID;
     frame.ext = frame.id > 2048;
-    frame.data64 = 0xabcd123456789101;
+    frame.data64 = 12;
     // frame.idx = frame.data64 % 3;
     const bool ok = can.tryToSend(frame);
     Serial.println("Sent");
@@ -56,9 +56,11 @@ void loop() {
     CanBusData_asukiaaa::Frame frame;
     can.receive(&frame);
     Serial.println("Received");
-    Serial.println(frame.toString());
+    /*Serial.println(frame.toString());
     Serial.print("at ");
-    Serial.println(millis());
+    Serial.println(millis());*/
+    int a = frame.id;
+    Serial.println(a);
   }
   delay(10);
 }
