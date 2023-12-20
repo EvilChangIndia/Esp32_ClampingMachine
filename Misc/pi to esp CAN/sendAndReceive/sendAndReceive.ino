@@ -36,6 +36,7 @@ void setup() {
 }
 
 void loop() {
+  
   static unsigned long trySendAt = 0;
   static const unsigned long intervalMs = 1000UL;
   if (trySendAt == 0 || millis() - trySendAt > intervalMs) {
@@ -43,7 +44,7 @@ void loop() {
     CanBusData_asukiaaa::Frame frame;
     frame.id = CAN_ID;
     frame.ext = frame.id > 2048;
-    frame.data64 = 12;
+    frame.data[0]=10
     // frame.idx = frame.data64 % 3;
     const bool ok = can.tryToSend(frame);
     Serial.println("Sent");

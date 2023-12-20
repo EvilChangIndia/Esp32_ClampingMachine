@@ -1,5 +1,7 @@
-//acknowledgements are as follows
-//0-9:failsafe entered  0:calibration failure 1:  10:calibration successful   11:motion completed
+//frame send to master : {state, ack, status, 0, angle1, angle2, 0, 0}
+//state: current state
+//ack: 0:message received 1:not received
+//status:   10:off successful, 11:on successful, 12: unclamp success, 13:calibration successful  14:clamp success 15:motion completed 0-9:curresponding errors. failsafe entered
 //for CAN bus
 #include <CanBusMCP2515_asukiaaa.h>
 #ifndef PIN_CS
@@ -40,7 +42,7 @@ const int acceleration = maxVelocity/2;  //worked better this way. Will affect p
 const int jogVelocity = 800;              //velocity at which myStepper.runSpeed() will move the rotor
 const int sweepRange=10;
 const int calibRevs = 2;
-const int clampTime = 3000; //time to complete clamping in milli-seconds
+const int clampTime = 500; //time to complete clamping in milli-seconds
 const int onTime = 1000; //startup time when turned on
 
 //frame structure
@@ -155,11 +157,13 @@ void calibrateRotor()
     Serial.print ("\nRotor Calibration Successful!\nHome found at ");
     Serial.println (home);
     microCalib=1;
+    canSend(2,13);
   }
   else  {
     state=-1;
     failSafeFlag=1;
     Serial.println ("Rotor Calibration Failed");
+    canSend(2,3);
   }
   //send rotor back to angle before calibration
   setRotor(angle);
@@ -201,8 +205,9 @@ void microCalibrateRotor()
     Serial.print("New home at ");
     Serial.println(home);
     calibrated=1;
+    canSend(2,13);
     //send rotor back to angle before calibration
-    //setRotor(angle);
+    setRotor(angle);
   }
   else {
     Serial.println("Rotor micro-calibration failed!\nTrying full calibration..");
@@ -230,13 +235,15 @@ void clamp(bool engage)
     Serial.println("Clamp is engaged..");
     digitalWrite(unclampPin, HIGH);  
     digitalWrite(clampPin, LOW);
-    //delay(1000);
+    delay(1000);
+    canSend(2,14);
   }
   else{
     Serial.println("Clamp is disengaged..");
     digitalWrite(clampPin, HIGH);  
     digitalWrite(unclampPin, LOW);
-    //delay(1000);
+    delay(1000);
+    canSend(2,12); //maybe needs while loop
   }
 
 }
@@ -250,17 +257,18 @@ bool canReceive()
     {
       state = frame.data[stateID];
       angle = frame.data[angleAID]+frame.data[angleBID];
+      canSend(1,1);
       return true;
       }
   }
   return false;
 }
 
-bool canSend(int stat)
+bool canSend(int i, int val)
 {
   frame.id = CAN_ID;
   frame.ext = frame.id > 2048;
-  frame.data64 = stat;
+  frame.data[i]= val;
   return can.tryToSend(frame);
 }
 //THE MAIN LOOP
@@ -272,7 +280,7 @@ void loop()
   switch(state) {
     case -1:  //Failsafe
       failSafe();
-      while (!canReceive());//until there is a new message event
+      while (!canReceive()) delay(50);//until there is a new message event
       break;
 
     case 0: //OFF state
@@ -281,20 +289,22 @@ void loop()
       digitalWrite(endStopVcc, LOW);
       digitalWrite(unclampPin, HIGH); 
       digitalWrite(clampPin, HIGH); 
-      while (!canReceive());//until there is a new message event
+      canSend(2,10);
+      while (!canReceive()) delay(50);//until there is a new message event
       break;
 
     case 1: //ON state
       Serial.println("Device On..");
       digitalWrite(enPin, LOW);
       digitalWrite(endStopVcc, HIGH);
-      while (!canReceive());//until there is a new message event
+      canSend(2,11);
+      while (!canReceive()) delay(50);//until there is a new message event
       break;
 
     case 2: //Un-clamped state
       
       clamp(false);
-      while (!canReceive());//until there is a new message event
+      while (!canReceive()) delay(50);//until there is a new message event
       break;
 
     case 3: //Calibration State
@@ -304,13 +314,13 @@ void loop()
         state = -1;
         break;
       }
-      while (!canReceive());//until there is a new message event
+      while (!canReceive()) delay(50);//until there is a new message event
       break;
 
     case 4: //Clamped state
       clamp(true);
       delay(clampTime);
-      while (!canReceive());//until there is a new message event
+      while (!canReceive()) delay(50);//until there is a new message event
       break;
 
     case 5: //Update angle
@@ -328,7 +338,7 @@ void loop()
         if (myStepper.distanceToGo()==0 && f==0) {
           f=1;
           Serial.println("motion completed");
-          bool i=canSend(11);
+          bool i=canSend(2,15);
         }       
       }
       break;

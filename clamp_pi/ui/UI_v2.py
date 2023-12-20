@@ -7,6 +7,7 @@
 #state 4: Clamped
 #state 5: Angle Update
 #state 6: Stepper Run
+from subprocess import call
 import RPi.GPIO as GPIO 
 import threading
 import time
@@ -60,15 +61,17 @@ prevState = 0
 rotorAngle = 0
 engaged = 0
 clampTime = 1   #time for pneumatic clamping in seconds
-
+operationWaitTime = 30 #half seconds
+receiveWaitTime = 5
 rotorHome = 270   #angular offset from encoder to home position
-
+#operationAcknowledge={0:10, 1:11}
 #define a class for handling on UI inputs
 class Handler:
 	#onDestroy triggers. can use just one onDestroy 
 	def onDestroy(self, *args):
 		print("Destroy triggered")
 		Gtk.main_quit()
+		GPIO.cleanup()
 		
 	#button triggers
 	def onButtonPressExit(self, button):
@@ -79,10 +82,12 @@ class Handler:
 	def onButtonPressPoweroff(self, button):
 		print("Power button pressed")
 		Gtk.main_quit()
+		GPIO.cleanup()
 	
 	def onButtonPressRestart(self, button):
 		print("Restart button pressed")
 		Gtk.main_quit()
+		GPIO.cleanup()
 	
 	def onButtonPressBack(self, button):
 		print("Back button pressed")
@@ -96,18 +101,28 @@ class Handler:
 		#turn machine on
 		state = 1
 		sendFrame()
-		time.sleep(0.25) #ping slaves here
-		print("Machine on. Homing..")
+		status = checkProgress(state, operationWaitTime) #replace with diff wait time
+		print("Machine turned ON") if status else print("Operation failed")#enter failsafe here
+		#
+		print("Calibrating rotor")
+		state=3
+		sendFrame()
+		status = checkProgress(state, operationWaitTime) #replace with diff wait time
+		print("Machine calibrated") if status else print("calibration failed")#enter failsafe here
 		#move rotor to home
+		print("Homing..")
 		state = 5
 		rotorAngle = rotorHome
 		updateDFAngle()
 		sendFrame()
-		checkClampReply() #waits for acknowledge
+		status = checkProgress(state, operationWaitTime) #replace with diff wait time
+		print("Machine home") if status else print("homing failed")#enter failsafe here
 		#switch to un-clamped state
+		print("Unclamping")
 		state = 2
 		sendFrame()
-		time.sleep(clampTime) #change to checkReply()
+		status = checkProgress(state, operationWaitTime) #replace with diff wait time
+		print("Machine Unclamped") if status else print("Unclamping failed")#enter failsafe here
 		#switch ui page
 		notebook.set_current_page(2)
 	
@@ -116,6 +131,8 @@ class Handler:
 		print("off button pressed")
 		state = 0
 		sendFrame()
+		status = checkProgress(state, operationWaitTime) #replace with diff wait time
+		print("Machine OFF") if status else print("Turning OFF failed")#enter failsafe here
 		notebook.set_current_page(1)
 		
 	def onButtonPressClamp(self, button):
@@ -125,20 +142,24 @@ class Handler:
 		#statusBoxClamped.set_text("Machine is ON.\nClamp ENGAGED")
 		state = 4
 		sendFrame()
-		time.sleep(clampTime)
+		status = checkProgress(state, operationWaitTime) #replace with diff wait time
+		print("Machine clamped") if status else print("clamping failed")#enter failsafe here
 		engaged = 1
 		notebook.set_current_page(3)
 	
 	def onButtonPressUnclamp(self, button):
 		global state
+		global engaged
 		print("un-clamp button pressed")
 		if (rotorAngle==rotorHome):
 			state = 2
 			sendFrame()
-			time.sleep(clampTime)
+			status = checkProgress(state, operationWaitTime) #replace with diff wait time
+			print("Machine Unclamped") if status else print("Unclamping failed")#enter failsafe here
 			notebook.set_current_page(2)
 			engaged=0
 		else:
+			#fix this byatch
 			print("Home the rotor, before unclamping!")
 			infoBoxClamped.set_text("Machine is in state "+str(state)+"\nClamp in state "+str(engaged)+"\nRotor at angle"+str(rotorAngle)+"\n\n\nHome the rotor, before unclamping!")
 	
@@ -150,7 +171,8 @@ class Handler:
 		rotorAngle= (0 if rotorAngle==360 else rotorAngle+90)
 		updateDFAngle()
 		sendFrame()
-		checkClampReply()
+		status = checkProgress(state, operationWaitTime) #replace with diff wait time
+		print("Motion successful") if status else print("motion failed")#enter failsafe here
 	
 	def onButtonPressACW(self, button):
 		global state
@@ -160,7 +182,8 @@ class Handler:
 		rotorAngle= (360 if rotorAngle==0 else rotorAngle-90)
 		updateDFAngle()
 		sendFrame()
-		checkClampReply()
+		status = checkProgress(state, operationWaitTime) #replace with diff wait time
+		print("Motion successful") if status else print("motion failed")#enter failsafe here
 		
 	def onButtonPressHome(self, button):
 		global state
@@ -170,35 +193,44 @@ class Handler:
 		rotorAngle = rotorHome
 		updateDFAngle()
 		sendFrame()
-		checkClampReply()
+		status = checkProgress(state, operationWaitTime) #replace with diff wait time
+		print("Homing successful") if status else print("Homing failed")#enter failsafe here
+		
 	
 	def onButtonPressCalibrate(self, button):
 		global state
 		print("Calibrate button pressed")
 		state = 3
 		sendFrame()
-		#add code to make device wait for feedback
+		status = checkProgress(state, operationWaitTime) #replace with diff wait time
+		print("Calibration successful") if status else print("Calibration failed")#enter failsafe here
 		
 	def onButtonPressCalibrateClamped(self, button):
 		global state
 		print("Calibrate button pressed")
 		state = 3
 		sendFrame()
-		#add code to make device wait for feedback
+		status = checkProgress(state, operationWaitTime) #replace with diff wait time
+		print("Calibration successful") if status else print("Calibration failed")#enter failsafe here
 		
 	def onButtonPressFailSafe(self, button):
 		global state
 		print("Failsafe button pressed")
 		state = -1
 		sendFrame()
+		status = checkProgress(state, operationWaitTime) #replace with diff wait time
+		print("Calibration successful") if status else print("Calibration failed")#enter failsafe here
 		#add code to make device wait for feedback
-		
 		notebook.set_current_page(1)   #change to failsafe page
 		
 def main():
+	global state
 	#set machine state to off
+	print("Turning machine off")
 	state=0
 	sendFrame()
+	status = checkProgress(0,operationWaitTime)
+	print("Machine turned OFF") if status else print("Operation failed")
 	#connect the callbacks from glade file widgets
 	builder.connect_signals(Handler())
 	#set starting page to offPage
@@ -214,34 +246,66 @@ def main():
 	Gtk.main()
 
 #some handy functions
-def checkClampReply():
-	while True:
-		msg=bus.recv()
-		if (list(msg.data)[0]==11):
-			print("motion completed")
-			break
-		elif (list(msg.data)[0]==0):
-			print("calibration failed.\nCheck endstop and motor functionality")
-			#move to failsafe screen here or return something
-		time.sleep(0.5)
+
+def checkReceive(t = receiveWaitTime):
+	msg=bus.recv(t)
+	if msg != None:
+		if (list(msg.data)[1]==1): #can just look for any message from esp. that proves its acknowledged
+			return True
+	return False
+
+def restartCAN():
+	global bus
+	print("turning off can")
+	call(["sudo", "ip", "link", "set", "can0", "down"])
+	time.sleep(2)
+	print("turning on can")
+	call(["sudo", "ip", "link", "set", "can0", "up", "type", "can", "bitrate", "125000"])
+	time.sleep(1)
+	print("configuring can")
+	call(["sudo", "ifconfig", "can0", "txqueuelen", "10000"])
+	time.sleep(2)
+	bus = can.interface.Bus(channel=channel, bustype=bustype,bitrate=125000)
 	return
-	
-def updateTime():
-	timeBoxOn.set_text(time.strftime('%H:%M:%S'))
-	timeBoxOff.set_text(time.strftime('%H:%M:%S'))
-	statusBoxOn.set_text("Machine is in state "+str(state)+"\nClamp in state "+str(engaged)+"\nRotor at angle"+str(rotorAngle))
-	statusBoxOff.set_text("Machine is in state "+str(state)+"\nClamp in state "+str(engaged)+"\nRotor at angle"+str(rotorAngle))
-	infoBoxClamped.set_text("Machine is in state "+str(state)+"\nClamp in state "+str(engaged)+"\nRotor at angle"+str(rotorAngle))
-	
-	
-	return True
-	
+
 def sendFrame():
 	global dataFrame
 	global state
 	dataFrame[statePos] = state
 	msg = can.Message(arbitration_id=clamp_ID, data=dataFrame, is_extended_id=False)
-	bus.send(msg)
+	bus.send(msg)	
+	if checkReceive():
+		print("send successfully")
+		return
+	else:   #here, implement failsafe detection
+		print("Transmission failed.\nPlease check connections for CAN.\nPress ctr+c to exit\nRestarting CAN..")
+		restartCAN()
+		print("Retrying transmission")
+		sendFrame()
+		
+def checkProgress(operation, waitTime = operationWaitTime):
+	msg = bus.recv(waitTime)
+	if (msg!=None): 
+		#use match case here
+		#
+		if (list(msg.data)[2] == operation + 10):    #success code of each operation/state is (10 + state)
+			return 1
+		elif (list(msg.data)[2]<10):
+			return 0
+	else:
+		print ("timer expired")#go to failsafe
+		return 0
+
+def updateTextBoxes():
+	global engaged
+	timeBoxOn.set_text(time.strftime('%H:%M:%S'))
+	timeBoxOff.set_text(time.strftime('%H:%M:%S'))
+	statusBoxOn.set_text("Machine is in state "+str(state)+"\nClamp in state "+str(engaged)+"\nRotor at angle"+str(rotorAngle))
+	statusBoxOff.set_text("Machine is in state "+str(state)+"\nClamp in state "+str(engaged)+"\nRotor at angle"+str(rotorAngle))
+	infoBoxClamped.set_text("Machine is in state "+str(state)+"\nClamp in state "+str(engaged)+"\nRotor at angle"+str(rotorAngle))
+	return True
+	
+
 
 def button_callback(args):    #function run on pedal press
 	global pedalPressTime
@@ -303,7 +367,7 @@ def updateState():
 
 if __name__ == "__main__":
 	try:
-		GLib.timeout_add(200, updateTime)     #adds function to gtk main loop
+		GLib.timeout_add(200, updateTextBoxes)     #adds function to gtk main loop
 		main()
 	except KeyboardInterrupt:
 		print("Execute GPIO-cleanup")
