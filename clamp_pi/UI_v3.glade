@@ -522,6 +522,129 @@
             <property name="tab-fill">False</property>
           </packing>
         </child>
+        <child>
+          <!-- n-columns=5 n-rows=4 -->
+          <object class="GtkGrid">
+            <property name="width-request">400</property>
+            <property name="height-request">240</property>
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="halign">center</property>
+            <property name="valign">center</property>
+            <property name="row-homogeneous">True</property>
+            <property name="column-homogeneous">True</property>
+            <child>
+              <object class="GtkTextView" id="loadingBox">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="editable">False</property>
+                <property name="justification">center</property>
+                <property name="cursor-visible">False</property>
+                <property name="accepts-tab">False</property>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">0</property>
+                <property name="width">5</property>
+                <property name="height">4</property>
+              </packing>
+            </child>
+          </object>
+          <packing>
+            <property name="position">4</property>
+          </packing>
+        </child>
+        <child type="tab">
+          <object class="GtkLabel" id="loadingPage">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="label" translatable="yes">Loading..</property>
+          </object>
+          <packing>
+            <property name="position">4</property>
+            <property name="tab-fill">False</property>
+          </packing>
+        </child>
+        <child>
+          <!-- n-columns=6 n-rows=7 -->
+          <object class="GtkGrid">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="row-spacing">3</property>
+            <property name="column-spacing">3</property>
+            <property name="row-homogeneous">True</property>
+            <property name="column-homogeneous">True</property>
+            <child>
+              <object class="GtkButton" id="continueButton">
+                <property name="label" translatable="yes">Continue</property>
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="receives-default">True</property>
+                <signal name="released" handler="onButtonPressContinue" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">4</property>
+                <property name="top-attach">5</property>
+                <property name="width">2</property>
+                <property name="height">2</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButton" id="failsafePowerButton">
+                <property name="label" translatable="yes">Power Off</property>
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="receives-default">True</property>
+                <signal name="released" handler="onButtonPressPoweroff" swapped="no"/>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">5</property>
+                <property name="width">2</property>
+                <property name="height">2</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkTextView" id="failsafeBox">
+                <property name="visible">True</property>
+                <property name="can-focus">True</property>
+                <property name="justification">center</property>
+              </object>
+              <packing>
+                <property name="left-attach">0</property>
+                <property name="top-attach">0</property>
+                <property name="width">6</property>
+                <property name="height">5</property>
+              </packing>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+            <child>
+              <placeholder/>
+            </child>
+          </object>
+          <packing>
+            <property name="position">5</property>
+          </packing>
+        </child>
+        <child type="tab">
+          <object class="GtkLabel" id="failsafePage">
+            <property name="visible">True</property>
+            <property name="can-focus">False</property>
+            <property name="label" translatable="yes">page 6</property>
+          </object>
+          <packing>
+            <property name="position">5</property>
+            <property name="tab-fill">False</property>
+          </packing>
+        </child>
       </object>
     </child>
   </object>
