@@ -1,7 +1,8 @@
+//machine states:-   100: FailSafe   0: OFF   1: ON   2: Unclamped    3: Clamped    4: Clamped    5: Update Angle   6:Stepper Run   
 //frame send to master : {state, ack, status, 0, angle1, angle2, 0, 0}
 //state: current state
 //ack: 0:message received 1:not received
-//status:   10:off successful, 11:on successful, 12: unclamp success, 13:calibration successful  14:clamp success 15:motion completed 0-9:curresponding errors. failsafe entered
+//status:   10:off successful, 11:on successful, 12: unclamp success, 13:calibration successful  14:clamp success 15:motion completed 0-9:curresponding errors. 110:failsafe entered
 //for CAN bus
 #include <CanBusMCP2515_asukiaaa.h>
 #ifndef PIN_CS
@@ -14,7 +15,7 @@
 #define PIN_RST -1
 #endif
 static const auto QUARTZ_FREQUENCY =
-    CanBusMCP2515_asukiaaa::QuartzFrequency::MHz8;
+CanBusMCP2515_asukiaaa::QuartzFrequency::MHz8;
 static const auto BITRATE = CanBusMCP2515_asukiaaa::BitRate::Kbps125;
 #ifndef CAN_ID
 #define CAN_ID 2000
@@ -225,8 +226,11 @@ void failSafe()
   if (failSafeFlag==1)  Serial.println ("\nPlease ensure that the endstop is functional!");
   //if (failsafeFlag==2)
   digitalWrite(enPin, HIGH);
+  digitalWrite(endStopVcc, LOW);
+  digitalWrite(unclampPin, HIGH); 
+  digitalWrite(clampPin, HIGH); 
   Serial.println("\nhelp meeeeee.... XP ");
-  while (true) ; //keep here
+  //while (true) ; //keep here
 }
 
 void clamp(bool engage)
@@ -273,13 +277,14 @@ bool canSend(int i, int val)
 }
 //THE MAIN LOOP
 //myStepper.run() has to be called repeatedly in this loop for the library to work
+//machine states:-   100: FailSafe   0: OFF   1: ON   2: Unclamped    3: Clamped    4: Clamped    5: Update Angle   6:Stepper Run   
 void loop() 
 { 
   //Serial.println(canSend(1));
-  //machine states:-   -1: FailSafe   0: OFF   1: ON   2: Unclamped    3: Clamped    4: Clamped    5: Update Angle   6:Stepper Run   
   switch(state) {
-    case -1:  //Failsafe
+    case 100:  //Failsafe
       failSafe();
+      canSend(2,110);
       while (!canReceive()) delay(50);//until there is a new message event
       break;
 
@@ -302,7 +307,8 @@ void loop()
       break;
 
     case 2: //Un-clamped state
-      
+      digitalWrite(enPin, LOW);
+      digitalWrite(endStopVcc, HIGH);
       clamp(false);
       while (!canReceive()) delay(50);//until there is a new message event
       break;
@@ -318,6 +324,8 @@ void loop()
       break;
 
     case 4: //Clamped state
+      digitalWrite(enPin, LOW);
+      digitalWrite(endStopVcc, HIGH);
       clamp(true);
       delay(clampTime);
       while (!canReceive()) delay(50);//until there is a new message event
