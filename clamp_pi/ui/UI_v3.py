@@ -7,6 +7,7 @@
 #state 4: Clamped
 #state 5: Angle Update
 #state 6: Stepper Run
+
 from subprocess import call
 import RPi.GPIO as GPIO 
 import threading
@@ -39,6 +40,7 @@ loadingBox = builder.get_object("loadingBox").get_buffer()
 #define pages {state:corresponding page number}
 page={100:5, 0:1, 1:4, 2:2, 3:4, 4:3, 5:4 }
 activity={100:"Entering Failsafe", 0:"Turning the machine OFF...", 1:"Turning the machine ON...", 2:"Un-Clamping...", 3:"Calibrating the rotor", 4:"Clamping...", 5:"Rotor in motion..."}
+
 #GPIO pinout
 pedalPin = 16
 
@@ -69,7 +71,10 @@ clampTime = 1   #time for pneumatic clamping in seconds
 operationWaitTime = 30 #half seconds
 receiveWaitTime = 5
 rotorHome = 270   #angular offset from encoder to home position
-#operationAcknowledge={0:10, 1:11}
+
+#state names 
+stateName={0:"OFF", 1:"ON", 2:"Un-Clamped", 3:"Calibrating", 4:"Clamped", 5:"Angle Update", 6:"Stepper Run"}
+
 #define a class for handling on UI inputs
 class Handler:
 	#onDestroy triggers. can use just one onDestroy 
@@ -435,8 +440,8 @@ def updateTextBoxes():
 	global engaged
 	timeBoxOn.set_text(time.strftime('%H:%M:%S'))
 	timeBoxOff.set_text(time.strftime('%H:%M:%S'))
-	statusBoxOn.set_text("Machine is in state "+str(state)+"\nClamp in state "+str(engaged)+"\nRotor at angle"+str(rotorAngle))
-	statusBoxOff.set_text("Machine is in state "+str(state)+"\nClamp in state "+str(engaged)+"\nRotor at angle"+str(rotorAngle))
+	statusBoxOn.set_text("Machine is in state "+stateName[state]+"\nClamp in state "+str(engaged)+"\nRotor at angle"+str(rotorAngle))
+	statusBoxOff.set_text("Machine is in state "+stateName[state]+"\nClamp in state "+str(engaged)+"\nRotor at angle"+str(rotorAngle))
 	#infoBoxClamped.set_text("Machine is in state "+str(state)+"\nClamp in state "+str(engaged)+"\nRotor at angle"+str(rotorAngle))
 	
 	loadingBox.set_text(activity[state]+"\n\nPlease wait..")
