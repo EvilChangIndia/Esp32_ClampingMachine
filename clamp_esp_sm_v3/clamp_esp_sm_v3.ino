@@ -251,7 +251,7 @@ void clamp(bool engage)
   }
 
 }
-//function to receive message from the can bus and check it against the can id of the device (2000)
+//function to receive message from the can bus and check it against the can id of the clamp (2000)
 bool canReceive()
 {
   if (can.available())
@@ -275,9 +275,16 @@ bool canSend(int i, int val)
   frame.data[i]= val;
   return can.tryToSend(frame);
 }
+
+
+
 //THE MAIN LOOP
 //myStepper.run() has to be called repeatedly in this loop for the library to work
 //machine states:-   100: FailSafe   0: OFF   1: ON   2: Unclamped    3: Clamped    4: Clamped    5: Update Angle   6:Stepper Run   
+//frame send to master : {state, ack, status, 0, angle1, angle2, 0, 0}
+//state: current state
+//ack: 0:message received 1:not received
+//status:   10:off successful, 11:on successful, 12: unclamp success, 13:calibration successful  14:clamp success 15:motion completed 0-9:curresponding errors. 110:failsafe entered
 void loop() 
 { 
   //Serial.println(canSend(1));
