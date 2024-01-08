@@ -40,6 +40,8 @@ loadingBox = builder.get_object("loadingBox").get_buffer()
 #define pages {state:corresponding page number}
 page={100:5, 0:1, 1:4, 2:2, 3:4, 4:3, 5:4 }
 activity={100:"Entering Failsafe", 0:"Turning the machine OFF...", 1:"Turning the machine ON...", 2:"Un-Clamping...", 3:"Calibrating the rotor", 4:"Clamping...", 5:"Rotor in motion..."}
+#state names 
+stateName={0:"OFF", 1:"ON", 2:"Un-Clamped", 3:"Calibrating", 4:"Clamped", 5:"Angle Update", 6:"Stepper Run", 100:"FailSafe"}
 
 #GPIO pinout
 pedalPin = 16
@@ -72,8 +74,6 @@ operationWaitTime = 30 #half seconds
 receiveWaitTime = 5
 rotorHome = 270   #angular offset from encoder to home position
 
-#state names 
-stateName={0:"OFF", 1:"ON", 2:"Un-Clamped", 3:"Calibrating", 4:"Clamped", 5:"Angle Update", 6:"Stepper Run"}
 
 #define a class for handling on UI inputs
 class Handler:
@@ -101,41 +101,28 @@ class Handler:
 	
 	def onButtonPressBack(self, button):
 		print("Back button pressed")
-		notebook.set_current_page(page(0))
+		notebook.set_current_page(page[0])
 		
 	def onButtonPressOn(self, button):
 		global state
 		global rotorAngle
-		global rotorHome
+		global prevState
+		prevState=state
 		print("on button pressed")
 		#turn machine on
 		state = 1
-		notebook.set_current_page(page[state])
+		notebook.set_current_page(page[state]) 
 		sendFrame()
 		status = checkProgress(state, operationWaitTime) #replace with diff wait time
 		if status:
-			print("Machine turned ON")  
+			print("Machine turned ON") 
 		else:
-			print("Operation failed")#enter failsafe here
-			state=0
-			failSafe()
 			return
-		print("Calibrating rotor")
-		state=3
-		notebook.set_current_page(page[state])
-		sendFrame()
-		status = checkProgress(state, operationWaitTime) #replace with diff wait time
-		if status:
-			print("Machine calibrated")  
-		else:
-			print("calibration failed")#enter failsafe here
-			state=0
-			failSafe()
-			return
+		
 		#move rotor to home
 		print("Homing..")
 		state = 5
-		notebook.set_current_page(page[state])
+		#notebook.set_current_page(page[state])
 		rotorAngle = rotorHome
 		updateDFAngle()
 		sendFrame()
@@ -143,43 +130,37 @@ class Handler:
 		if status:
 			print("Machine home")  
 		else:
-			print("homing failed")#enter failsafe here
-			state=0
-			failSafe()
 			return
+		
 		#switch to un-clamped state
 		print("Unclamping")
 		state = 2
-		notebook.set_current_page(4)#loading page
+		#notebook.set_current_page(4)#loading page
 		sendFrame()
 		status = checkProgress(state, operationWaitTime) #replace with diff wait time
 		if status:
 			print("Machine Unclamped")  
 			notebook.set_current_page(page[state])
-		else:
-			print("Unclamping failed")#enter failsafe here
-			state=0
-			failSafe()
 	
 	def onButtonPressOff(self, button):
 		global state
-		print("off button pressed")
+		global prevState
+		prevState=state
+		print("Off button pressed")
 		state = 0
-		notebook.set_current_page(4)#loading page
+		#notebook.set_current_page(4)#loading page
 		sendFrame()
 		status = checkProgress(state, operationWaitTime) #replace with diff wait time
 		if status:
 			print("Machine OFF")
 			notebook.set_current_page(page[state])
-		else:
-			print("Turning OFF failed")#enter failsafe here
-			state=1
-			failSafe()
 		
 
 	def onButtonPressClamp(self, button):
 		global state
 		global engaged
+		global prevState
+		prevState=state
 		print("clamp button pressed")
 		#statusBoxClamped.set_text("Machine is ON.\nClamp ENGAGED")
 		state = 4
@@ -192,43 +173,36 @@ class Handler:
 			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle))
 			notebook.set_current_page(page[state])
 			engaged = 1
-		else:
-			print("clamping failed")#enter failsafe here
-			state = 2
-			failSafe()
-			return
 	
 	def onButtonPressUnclamp(self, button):
 		global state
 		global engaged
+		global prevState
+		prevState=state
 		print("un-clamp button pressed")
 		if (rotorAngle==rotorHome):
 			state = 2
-			notebook.set_current_page(4)#loading page
+			#notebook.set_current_page(4)#loading page
 			sendFrame()
+			print("at 1")
 			status = checkProgress(state, operationWaitTime) #replace with diff wait time
-			#print("Machine Unclamped") if status else print("Unclamping failed")#enter failsafe here
+			print("at 2")
 			if status:
 				print("Machine Un-clamped")
 				notebook.set_current_page(page[state])
 				engaged=0
-			else:
-				print("Un-clamping failed")#enter failsafe here
-				state = 4
-				failSafe()
-				return
-			
+			print("at 3")
 		else:
 			#fix this byatch
 			print("Home the rotor, before unclamping!")
 			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle)+"\n\nHome the rotor, before unclamping!")
 			#maybe display on failsafe page
-
-			#notebook.set_current_page(page[state])
 	
 	def onButtonPressCW(self, button):
 		global state
 		global rotorAngle
+		global prevState
+		prevState = state
 		print("+90 button pressed")
 		state = 5
 		notebook.set_current_page(page[state])
@@ -237,20 +211,17 @@ class Handler:
 		sendFrame()
 		status = checkProgress(state, operationWaitTime) #replace with diff wait time
 		#print("Motion successful") if status else print("motion failed")#enter failsafe here
+		state = prevState
 		if status:
 			print("Motion successful")
 			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle))
-			state = 4
 			notebook.set_current_page(page[state])
-		else:
-			print("motion failed")#enter failsafe here
-			state= 4
-			failSafe()
-			return
-	
+		
 	def onButtonPressACW(self, button):
 		global state
 		global rotorAngle
+		global prevState
+		prevState = state
 		print("-90 button pressed")
 		state = 5
 		notebook.set_current_page(page[state])
@@ -258,21 +229,18 @@ class Handler:
 		updateDFAngle()
 		sendFrame()
 		status = checkProgress(state, operationWaitTime) #replace with diff wait time
+		state = prevState
 		if status:
 			print("Motion successful")
 			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle))
-			state = 4
 			notebook.set_current_page(page[state])
-		else:
-			print("motion failed")#enter failsafe here
-			state=4
-			failSafe()
-			return
 	
 		
 	def onButtonPressHome(self, button):
 		global state
 		global rotorAngle
+		global prevState
+		prevState = state
 		print("Home button pressed")
 		state = 5
 		notebook.set_current_page(page[state])
@@ -281,17 +249,12 @@ class Handler:
 		sendFrame()
 		status = checkProgress(state, operationWaitTime) #replace with diff wait time
 		#print("Homing successful") if status else print("Homing failed")#enter failsafe here
+		state = prevState
 		if status:
 			print("Motion successful")
 			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle))
-			state = 4
 			notebook.set_current_page(page[state])
-		else:
-			print("motion failed")#enter failsafe here
-			state=4
-			failSafe()
-			return
-	
+
 	def onButtonPressCalibrate(self, button):
 		global state
 		global prevState
@@ -301,17 +264,12 @@ class Handler:
 		sendFrame()
 		status = checkProgress(state, operationWaitTime) #replace with diff wait time
 		#print("Calibration successful") if status else print("Calibration failed")#enter failsafe here
+		state = prevState
 		if status:
 			print("Calibration successful")
 			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle)+"\n\nCalibration Successful")
-			state = 2
 			notebook.set_current_page(page[state])
-		else:
-			print("Calibration failed")#enter failsafe here
-			state=2
-			failSafe()
-			return
-		
+
 	def onButtonPressCalibrateClamped(self, button):
 		global state
 		global prevState
@@ -321,36 +279,28 @@ class Handler:
 		sendFrame()
 		status = checkProgress(state, operationWaitTime) #replace with diff wait time
 		#print("Calibration successful") if status else print("Calibration failed")#enter failsafe here
+		state = prevState
 		if status:
 			print("Calibration successful")
 			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle)+"\n\nCalibration Successful")
-			state = 4
 			notebook.set_current_page(page[state])
-		else:
-			print("Calibration failed")#enter failsafe here
-			state=4
-			failSafe()
-			return
 		
 	def onButtonPressFailSafe(self, button):
+		global prevState
+		prevState=state
 		failSafe()
 	
 	def onButtonPressContinue(self, button):
 		global state
-		global prevState
 		print("Exiting Failsafe mode..")
 		state=prevState
 		sendFrame()
 		status = checkProgress(state, operationWaitTime) #replace with diff wait time
 		#print("Returning to previous state") if status else print("Failsafe exit failed")#enter failsafe here
 		if status:
-			print("Returning to previous state")
+			print("Returned to previous state")
 			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle))
 			notebook.set_current_page(page[state])
-		else:
-			print("Failsafe exit failed")#enter failsafe here
-			failSafe()
-			return
 		
 def main():
 	global state
@@ -367,19 +317,14 @@ def main():
 	notebook.set_current_page(1)
 	#make UI window fullscreen
 	window.fullscreen()
-	#window.set_size_request (800,480)
 	#display the UI
 	window.show()
-	#statusBoxOff.set_text("Machine is OFF.\nClamp and Rotor DISENGAGED")
-	#timeBoxOff=
 	#initiate the gtk main loop
 	Gtk.main()
 
 #some handy functions
 def failSafe():
 	global state
-	global prevState
-	prevState=state
 	state = 100
 	sendFrame()
 	status = checkProgress(state, operationWaitTime) #replace with diff wait time
@@ -425,15 +370,26 @@ def sendFrame():
 		
 def checkProgress(operation, waitTime = operationWaitTime):
 	msg = bus.recv(waitTime)
+	global state
 	if (msg!=None): 
 		#use match case here
 		#
+		print("received reply", list(msg.data)[2])
 		if (list(msg.data)[2] == operation + 10):    #success code of each operation/state is (10 + state)
 			return 1
 		elif (list(msg.data)[2]<10):
+			print("Failed" + activity[operation])#enter failsafe here
+			state = prevState
+			notebook.set_current_page(page[state])
+			failSafe()
 			return 0
+		else:
+			checkProgress(operation,waitTime)
 	else:
 		print ("timer expired")#go to failsafe
+		state = prevState
+		notebook.set_current_page(page[state])
+		failSafe()
 		return 0
 
 def updateTextBoxes():
@@ -448,7 +404,6 @@ def updateTextBoxes():
 	return True
 	
 
-
 def button_callback(args):    #function run on pedal press
 	global pedalPressTime
 	count=0
@@ -460,17 +415,6 @@ def button_callback(args):    #function run on pedal press
 	print("for ", pedalPressTime, " seconds")
 	updateState()
 
-def off():
-	global dataFrame
-	global state
-	state=0
-	#print("Dis-engaging the clamp..")
-	#dataFrame[statePos] = 2
-	#sendFrame()
-	print("Switching off..")
-	dataFrame[statePos] = state
-	sendFrame()
-	
 def updateDFAngle():
 	global dataFrame
 	a=rotorAngle

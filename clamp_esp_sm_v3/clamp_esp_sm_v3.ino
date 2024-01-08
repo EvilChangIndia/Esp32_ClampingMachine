@@ -273,14 +273,19 @@ bool canSend(int i, int val)
   frame.id = CAN_ID;
   frame.ext = frame.id > 2048;
   frame.data[i]= val;
-  return can.tryToSend(frame);
+  while(!can.tryToSend(frame)){
+    Serial.println("Sending again");
+    Serial.println(val);
+  }
+  return 1;
+  //return can.tryToSend(frame);
 }
 
 
 
 //THE MAIN LOOP
 //myStepper.run() has to be called repeatedly in this loop for the library to work
-//machine states:-   100: FailSafe   0: OFF   1: ON   2: Unclamped    3: Clamped    4: Clamped    5: Update Angle   6:Stepper Run   
+//machine states:-   100: FailSafe   0: OFF   1: ON   2: Unclamped    3: Calibration    4: Clamped    5: Update Angle   6:Stepper Run   
 //frame send to master : {state, ack, status, 0, angle1, angle2, 0, 0}
 //state: current state
 //ack: 0:message received 1:not received
@@ -334,7 +339,6 @@ void loop()
       digitalWrite(enPin, LOW);
       digitalWrite(endStopVcc, HIGH);
       clamp(true);
-      delay(clampTime);
       while (!canReceive()) delay(50);//until there is a new message event
       break;
 

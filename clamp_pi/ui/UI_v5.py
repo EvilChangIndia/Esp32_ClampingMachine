@@ -19,6 +19,13 @@ gi.require_version('Gtk', '3.0')            # Load the correct namespace and ver
 from gi.repository import Gtk               # Include the python bindings for GTK
 from gi.repository import GLib              # included for adding things to gtk main loop
 
+
+#GPIO pinout
+pedalPin = 16
+
+GPIO.setmode(GPIO.BCM)
+GPIO.setup(pedalPin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+
 #import UI glade file into a GTK.Builder object
 gladeFile = "UI_v3.glade"      # Variable gladeFile holding the XML file path 
 builder = Gtk.Builder()            # GTK Builder called 
@@ -39,15 +46,10 @@ loadingBox = builder.get_object("loadingBox").get_buffer()
 
 #define pages {state:corresponding page number}
 page={100:5, 0:1, 1:4, 2:2, 3:4, 4:3, 5:4 }
+#actions
 activity={100:"Entering Failsafe", 0:"Turning the machine OFF...", 1:"Turning the machine ON...", 2:"Un-Clamping...", 3:"Calibrating the rotor", 4:"Clamping...", 5:"Rotor in motion..."}
 #state names 
 stateName={0:"OFF", 1:"ON", 2:"Un-Clamped", 3:"Calibrating", 4:"Clamped", 5:"Angle Update", 6:"Stepper Run", 100:"FailSafe"}
-
-#GPIO pinout
-pedalPin = 16
-
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(pedalPin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
 
 #can bus configuration
@@ -157,47 +159,13 @@ class Handler:
 		
 
 	def onButtonPressClamp(self, button):
-		global state
-		global engaged
-		global prevState
-		prevState=state
 		print("clamp button pressed")
-		#statusBoxClamped.set_text("Machine is ON.\nClamp ENGAGED")
-		state = 4
-		notebook.set_current_page(4)#loading page
-		sendFrame()
-		status = checkProgress(state, operationWaitTime) #replace with diff wait time
-		#print("Machine clamped") if status else print("clamping failed")#enter failsafe here
-		if status:
-			print("Machine clamped")
-			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle))
-			notebook.set_current_page(page[state])
-			engaged = 1
+		clampEngage()
 	
 	def onButtonPressUnclamp(self, button):
-		global state
-		global engaged
-		global prevState
-		prevState=state
 		print("un-clamp button pressed")
-		if (rotorAngle==rotorHome):
-			state = 2
-			#notebook.set_current_page(4)#loading page
-			sendFrame()
-			print("at 1")
-			status = checkProgress(state, operationWaitTime) #replace with diff wait time
-			print("at 2")
-			if status:
-				print("Machine Un-clamped")
-				notebook.set_current_page(page[state])
-				engaged=0
-			print("at 3")
-		else:
-			#fix this byatch
-			print("Home the rotor, before unclamping!")
-			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle)+"\n\nHome the rotor, before unclamping!")
-			#maybe display on failsafe page
-	
+		clampDisengage()
+
 	def onButtonPressCW(self, button):
 		global state
 		global rotorAngle
@@ -301,7 +269,7 @@ class Handler:
 			print("Returned to previous state")
 			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle))
 			notebook.set_current_page(page[state])
-		
+clampHandler = Handler()		
 def main():
 	global state
 	restartCAN()
@@ -312,13 +280,15 @@ def main():
 	status = checkProgress(0,operationWaitTime)
 	print("Machine turned OFF") if status else print("Operation failed")
 	#connect the callbacks from glade file widgets
-	builder.connect_signals(Handler())
+	builder.connect_signals(clampHandler)
 	#set starting page to offPage
 	notebook.set_current_page(1)
 	#make UI window fullscreen
 	window.fullscreen()
 	#display the UI
 	window.show()
+	#start the button handler thread for pedal press
+	pedal = ButtonHandler(pedalPin, GPIO.RISING, button_callback,0.1)
 	#initiate the gtk main loop
 	Gtk.main()
 
@@ -413,7 +383,46 @@ def button_callback(args):    #function run on pedal press
 		time.sleep(0.01)
 	pedalPressTime = count*0.01
 	print("for ", pedalPressTime, " seconds")
-	updateState()
+	pedalUpdateState()
+
+def clampEngage():
+	global state
+	global engaged
+	global prevState
+	prevState=state
+	state = 4
+	notebook.set_current_page(4)#loading page
+	sendFrame()
+	status = checkProgress(state, operationWaitTime) #replace with diff wait time
+	#print("Machine clamped") if status else print("clamping failed")#enter failsafe here
+	if status:
+		print("Machine clamped")
+		infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle))
+		notebook.set_current_page(page[state])
+		engaged = 1
+
+def clampDisengage():
+	global state
+	global engaged
+	global prevState
+	prevState=state
+	if (rotorAngle==rotorHome):
+		state = 2
+		#notebook.set_current_page(4)#loading page
+		sendFrame()
+		print("at 1")
+		status = checkProgress(state, operationWaitTime) #replace with diff wait time
+		print("at 2")
+		if status:
+			print("Machine Un-clamped")
+			notebook.set_current_page(page[state])
+			engaged=0
+		print("at 3")
+	else:
+		#fix this byatch
+		print("Home the rotor, before unclamping!")
+		infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle)+"\n\nHome the rotor, before unclamping!")
+		#maybe display on failsafe page
 
 def updateDFAngle():
 	global dataFrame
@@ -422,32 +431,25 @@ def updateDFAngle():
 	a-=b
 	dataFrame[angleAPos] = a
 	dataFrame[angleBPos] = b
-
-def updateState():
+def clampRotate():
+	print("execute rotation code here")
+	
+def pedalUpdateState():
 	global pedalPressTime
 	global rotorAngle
 	global state
 	global engaged
 	global dataFrame
-	if  pedalPressTime>1.5:
-		if engaged==0:
+	if  pedalPressTime>1.5 :
+		if state==2:
 			print("execute clamping")
-			engaged=1
-			state=4
-			sendFrame()
-		else:
+			clampEngage()
+		elif state==4:
 			print("execute un-clamping")
-			engaged=0
-			state=2
-			sendFrame()
+			clampDisengage()
 	else:
-		if engaged:
-			rotorAngle= (0 if rotorAngle==360 else rotorAngle+90)
-			print("Setting rotary axis to ",rotorAngle," degree(s)")
-			state=5
-			updateDFAngle()
-			sendFrame()
-
+		if state==4:
+			clampRotate()
 		else:
 			print("currently unclamped!")
 
