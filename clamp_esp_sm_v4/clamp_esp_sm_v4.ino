@@ -45,6 +45,7 @@ const int sweepRange=10;
 const int calibRevs = 2;
 const int clampTime = 500; //time to complete clamping in milli-seconds
 const int onTime = 1000; //startup time when turned on
+const int homeAngle = 90;
 
 //frame structure
 //[stateID, free, free, free, angleA, angleB]
@@ -109,8 +110,8 @@ void setup() {
   inMotion=0;
   //initialise state variables
   state=0;
-  angle=0;
   home=0;
+  angle=0;
   calibrated=1;
   microCalib=1;
   failSafeFlag=0;
@@ -125,24 +126,24 @@ void startupRoutine() {
   digitalWrite(endStopVcc, HIGH);
   Serial.println("Running initial calibration..");
   microCalibrateRotor();
-  setRotor(270);
+  
 }
 
 //function for homing the rotor
 void homeRotor()  {
   Serial.println("Homing..");
-  setRotor(0);
+  setRotor(home);
   return;
 }
 
 //function for moving the rotor to given angle. 
 //WARNING. This stops everything else from running
 void setRotor(int a)  {
-  steps = posPerRev * a * gearRatio/360.0;
-  steps = steps + home;
+  Serial.print("Setting rotor to angle ");
+  Serial.println(a);
+  steps = (posPerRev * a * gearRatio/360.0);
   myStepper.moveTo(steps);
-  while(myStepper.distanceToGo() != 0)  myStepper.run();
-
+  myStepper.runToPosition();
   return;
 }
 
@@ -151,7 +152,6 @@ void setRotor(int a)  {
 void calibrateRotor() 
 { 
   calibrated=0;
-  //homeRotor();
   Serial.println ("\nCalibrating Rotor");
   myStepper.move(posPerRev * calibRevs * gearRatio);
   int endStopRead = digitalRead(endStop);
@@ -161,13 +161,21 @@ void calibrateRotor()
     if (digitalRead(endStop)) {
       endStopRead = 1;
       home = myStepper.currentPosition()-100; //if home is found
+      Serial.print ("\nHome found at : ");
+      Serial.println (home);
       calibrated=1;
       myStepper.stop();
+      myStepper.runToPosition();  //calls run() until motor comes to stop
+      Serial.println ("\nReturning Home");
+      myStepper.moveTo(home);
+      myStepper.runToPosition();  //calls run() until motor reaches the target (home)
     }
   }
   if (calibrated)  {   //if home is found,
-    Serial.print ("\nRotor Calibration Successful!\nHome found at ");
-    Serial.println (home);
+    Serial.println ("\nApplying changes..");
+    home = posPerRev * homeAngle * gearRatio/360.0;
+    myStepper.setCurrentPosition(home);
+    Serial.println ("\nRotor Calibration Successful!");
     microCalib=1;
     canSend(2,13);
   }
@@ -213,20 +221,20 @@ void microCalibrateRotor()
   }
   if (microCalib){
     Serial.println("micro-calibrated.");
-    home = myStepper.currentPosition();
-    Serial.print("New home at ");
-    Serial.println(home);
+    myStepper.setCurrentPosition((posPerRev * homeAngle * gearRatio/360.0)+100);
     calibrated=1;
     canSend(2,13);
     //send rotor back to angle before calibration
-    setRotor(angle);
+    //setRotor(angle);
   }
   else {
     Serial.println("Rotor micro-calibration failed!\nTrying full calibration..");
     //homeRotor();
     calibrateRotor();
+    return;
   }
-  myStepper.moveTo(home); //to cancel any residual movements
+  //send rotor back to angle before calibration
+  setRotor(angle); //to cancel any residual movements
   return;
 }
 
@@ -354,8 +362,7 @@ void loop()
       break;
 
     case 5: //Update angle
-      steps = posPerRev * angle * gearRatio/360.0;
-      steps = steps + home;
+      steps = (posPerRev * angle * gearRatio/360.0);
       myStepper.moveTo(steps);
       Serial.print("\nSetting target angle to : ");
       Serial.println(angle);
