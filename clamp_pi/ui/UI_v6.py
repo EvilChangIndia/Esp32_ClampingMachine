@@ -76,8 +76,10 @@ rotorAngle = 0
 rotorDirection = 1
 pedalRotateDelta = 90
 engaged = 0
+
 clampTime = 1   #predal press time for triggering pneumatic clamping in seconds
 operationWaitTime = 30 #half seconds
+clampWaitTime = 2
 receiveWaitTime = 5
 rotorHome = 0   #starting/default position of the rotor
 retryCounter = 0	#to keep track of CAN bus retries
@@ -134,13 +136,7 @@ class Handler:
 		
 		#switch to un-clamped state
 		print("Unclamping")
-		state = 2
-		#notebook.set_current_page(4)#loading page
-		sendFrame()
-		status = checkProgress(state, operationWaitTime) #replace with diff wait time
-		if status:
-			print("Machine Unclamped")  
-			notebook.set_current_page(page[state])
+		clampEngage(True)
 	
 	def onButtonPressOff(self, button):
 		global state
@@ -302,6 +298,7 @@ def homeRotor():
 		print("Homing successful")
 		rotorAngle=0
 		sendFrame()
+		status = checkProgress(state, operationWaitTime) #replace with diff wait time
 		infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle))	
 	state = prevState
 	notebook.set_current_page(page[state])	
@@ -359,9 +356,14 @@ def restartCAN():
 def checkReceive(sendState, t = receiveWaitTime):
 	msg=bus.recv(t)
 	if msg != None:
-		print("Received:", list(msg.data)[1])
-		if (list(msg.data)[1]==sendState): #can just look for any message from esp. that proves its acknowledged
-			return True
+		recLen=len(list(msg.data))
+		if recLen >=3:
+			print("Received:", list(msg.data)[1])
+			if (list(msg.data)[1]==sendState): #can just look for any message from esp. that proves its acknowledged
+				return True
+		else:
+			print("wrong length reply")
+			checkReceive(sendState, t)
 	return False
 
 def sendFrame():
@@ -380,20 +382,21 @@ def sendFrame():
 	if checkReceive(state):
 		print("Message received by clamp!")
 		retryCounter = 0
-		return
+		return 1
 	elif retryCounter <= canRetryLimit:   #here, implement failsafe detection
 		print("Transmission failed.\nRestarting CAN..")
 		restartCAN()
 		print("Retrying transmission")
 		retryCounter = retryCounter + 1 
-		sendFrame()
+		return sendFrame()
 	else:
 		print("CANbus Retry counter limit exceeded!\n Clamp not found.\nPress ctr+c to exit")
 		print("Entering Failsafe mode")
 		failSafe()
-		return
+		return 0
 		
 def checkProgress(operation, waitTime = operationWaitTime):
+	print("checking progress")
 	msg = bus.recv(waitTime)
 	global state
 	if (msg!=None): 
@@ -425,12 +428,11 @@ def checkProgress(operation, waitTime = operationWaitTime):
 			sendFrame()
 			return checkProgress(state)
 			
-	else:
+	else: #add retry counter here and mtrigger failsafe
 		print ("timer expired. No progress reported by Clamp.")	#go to failsafe
-		state = prevState
-		notebook.set_current_page(page[state])
-		failSafe()
-		return 0
+		print("Sending again..")
+		sendFrame()
+		return checkProgress(state)
 
 def updateTextBoxes():
 	global engaged
@@ -451,8 +453,8 @@ def clampEngage(yes):
 	prevState=state
 	state = 4 if yes else 2
 	notebook.set_current_page(4)#loading page
-	sendFrame()
-	status = checkProgress(state, operationWaitTime) #replace with diff wait time
+	status = sendFrame()
+	#status = checkProgress(state, clampWaitTime) #replace with diff wait time
 	#print("Machine clamped") if status else print("clamping failed")#enter failsafe here
 	if status:
 		print("Machine clamped") if yes else print("Machine Un-clamped")

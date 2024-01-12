@@ -260,14 +260,14 @@ void clamp(bool engage)
     digitalWrite(unclampPin, HIGH);  
     digitalWrite(clampPin, LOW);
     delay(1000);
-    canSend(2,14);
+    //canSend(2,14);
   }
   else{
     Serial.println("Clamp is disengaged..");
     digitalWrite(clampPin, HIGH);  
     digitalWrite(unclampPin, LOW);
     delay(1000);
-    canSend(2,12); //maybe needs while loop
+    //canSend(2,12); //maybe needs while loop
   }
 
 }
