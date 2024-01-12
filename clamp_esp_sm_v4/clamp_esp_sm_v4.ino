@@ -48,7 +48,7 @@ const int onTime = 1000; //startup time when turned on
 const int homeAngle = 90;
 
 //frame structure
-//[stateID, free, free, free, angleA, angleB]
+//[stateID, targetStateID, free, free, angleA, angleB]
 //required rotor angle = angleA + angleB
 const int stateID = 0; 
 const int angleAID = 4;
@@ -56,10 +56,11 @@ const int angleBID = 5;
 
 
 //some global variables
-int steps=0;
+int targetPosition=0;
 int revolutions = 1;
 int home=0;
 int angle=0;
+int prevAngle = 0;
 int inMotion=0;
 int calibrated=1;
 int microCalib=1;
@@ -105,7 +106,7 @@ void setup() {
   Serial.println("CAN link successful!");
   //CanBusData_asukiaaa::Frame frame;
   //initialise variables
-  steps=0;
+  targetPosition=0;
   home=0;
   inMotion=0;
   //initialise state variables
@@ -141,8 +142,8 @@ void homeRotor()  {
 void setRotor(int a)  {
   Serial.print("Setting rotor to angle ");
   Serial.println(a);
-  steps = (posPerRev * a * gearRatio/360.0);
-  myStepper.moveTo(steps);
+  targetPosition = (posPerRev * a * gearRatio/360.0);
+  myStepper.moveTo(targetPosition);
   myStepper.runToPosition();
   return;
 }
@@ -248,7 +249,7 @@ void failSafe()
   digitalWrite(endStopVcc, LOW);
   digitalWrite(unclampPin, HIGH); 
   digitalWrite(clampPin, HIGH); 
-  Serial.println("\nhelp meeeeee.... XP ");
+  Serial.println("\nhelp meeeeee....  ");
   //while (true) ; //keep here
 }
 
@@ -278,9 +279,12 @@ bool canReceive()
     can.receive(&frame);
     if (frame.id==CAN_ID)
     {
+      prevAngle = angle;
       state = frame.data[stateID];
       angle = frame.data[angleAID]+frame.data[angleBID];
-      canSend(1,1);
+      Serial.print("Received State: ");
+      Serial.println(state);
+      canSend(1,state);
       return true;
       }
   }
@@ -292,8 +296,12 @@ bool canSend(int i, int val)
   frame.id = CAN_ID;
   frame.ext = frame.id > 2048;
   frame.data[i]= val;
+  Serial.print("Sending Value: ");
+  Serial.print(val);
+  Serial.print(" , at postion: ");
+  Serial.println(i);
   while(!can.tryToSend(frame)){
-    Serial.println("Sending again");
+    Serial.print("Sending again");
     Serial.println(val);
   }
   return 1;
@@ -362,8 +370,12 @@ void loop()
       break;
 
     case 5: //Update angle
-      steps = (posPerRev * angle * gearRatio/360.0);
-      myStepper.moveTo(steps);
+      Serial.print("\nCurrent angle: ");
+      Serial.print(prevAngle);
+      targetPosition = (posPerRev * angle * gearRatio/360.0);
+      if (prevAngle == 360 && angle <= 180)  myStepper.setCurrentPosition(0);
+      if (prevAngle == 0 && angle >= 180)  myStepper.setCurrentPosition(posPerRev * gearRatio);
+      myStepper.moveTo(targetPosition);
       Serial.print("\nSetting target angle to : ");
       Serial.println(angle);
       state=6;
@@ -376,7 +388,8 @@ void loop()
           f=1;
           Serial.println("motion completed");
           bool i=canSend(2,15);
-        }       
+          
+        }      
       }
       break;
     }

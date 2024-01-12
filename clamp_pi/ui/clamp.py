@@ -9,6 +9,7 @@
 #state 6: Stepper Run
 
 from subprocess import call
+from xml.sax.handler import property_declaration_handler
 import RPi.GPIO as GPIO 
 import threading
 import time
@@ -52,13 +53,14 @@ activity={100:"Entering Failsafe", 0:"Turning the machine OFF...", 1:"Turning th
 stateName={0:"OFF", 1:"ON", 2:"Un-Clamped", 3:"Calibrating", 4:"Clamped", 5:"Angle Update", 6:"Stepper Run", 100:"FailSafe"}
 
 
-#can bus configuration
+#CAN bus configuration
 bustype = 'socketcan'
 channel = 'can0'
 bus = can.interface.Bus(channel=channel, bustype=bustype,bitrate=125000)
 clamp_ID = 0x7D0      #address of clamp ESP set to 2000
+canRetryLimit = 5
 
-#frame definition
+#CAN dataframe definition
 #dataFrame = [State,_,_,_,angleA,angleB]
 dataFrame = [0 ,0 ,0 ,0 ,0 ,0 ]
 statePos = 0
@@ -70,11 +72,14 @@ pedalPressTime=0.0
 state = 0
 prevState = 0
 rotorAngle = 0
+pedalRotateDelta = -45
 engaged = 0
-clampTime = 1   #time for pneumatic clamping in seconds
+clampTime = 1   #predal press time for triggering pneumatic clamping in seconds
 operationWaitTime = 30 #half seconds
 receiveWaitTime = 5
-rotorHome = 270   #angular offset from encoder to home position
+rotorHome = 0   #starting/default position of the rotor
+retryCounter = 0	#to keep track of CAN bus retries
+
 
 
 #define a class for handling on UI inputs
@@ -160,48 +165,25 @@ class Handler:
 
 	def onButtonPressClamp(self, button):
 		print("clamp button pressed")
-		clampEngage()
+		clampEngage(True)
 	
 	def onButtonPressUnclamp(self, button):
 		print("un-clamp button pressed")
-		clampDisengage()
+		if (rotorAngle==rotorHome):
+			clampEngage(False)
+		else:
+			#fix this byatch
+			print("Home the rotor, before unclamping!")
+			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle)+"\n\nHome the rotor, before unclamping!")
+			#maybe display on failsafe page
 
 	def onButtonPressCW(self, button):
-		global state
-		global rotorAngle
-		global prevState
-		prevState = state
 		print("+90 button pressed")
-		state = 5
-		notebook.set_current_page(page[state])
-		rotorAngle= (0 if rotorAngle==360 else rotorAngle+90)
-		updateDFAngle()
-		sendFrame()
-		status = checkProgress(state, operationWaitTime) #replace with diff wait time
-		#print("Motion successful") if status else print("motion failed")#enter failsafe here
-		state = prevState
-		if status:
-			print("Motion successful")
-			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle))
-			notebook.set_current_page(page[state])
+		clampRotate(90)
 		
 	def onButtonPressACW(self, button):
-		global state
-		global rotorAngle
-		global prevState
-		prevState = state
-		print("-90 button pressed")
-		state = 5
-		notebook.set_current_page(page[state])
-		rotorAngle= (360 if rotorAngle==0 else rotorAngle-90)
-		updateDFAngle()
-		sendFrame()
-		status = checkProgress(state, operationWaitTime) #replace with diff wait time
-		state = prevState
-		if status:
-			print("Motion successful")
-			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle))
-			notebook.set_current_page(page[state])
+		print("+90 button pressed")
+		clampRotate(-90)
 	
 		
 	def onButtonPressHome(self, button):
@@ -254,8 +236,6 @@ class Handler:
 			notebook.set_current_page(page[state])
 		
 	def onButtonPressFailSafe(self, button):
-		global prevState
-		prevState=state
 		failSafe()
 	
 	def onButtonPressContinue(self, button):
@@ -269,7 +249,9 @@ class Handler:
 			print("Returned to previous state")
 			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle))
 			notebook.set_current_page(page[state])
+
 clampHandler = Handler()		
+
 def main():
 	global state
 	restartCAN()
@@ -292,9 +274,56 @@ def main():
 	#initiate the gtk main loop
 	Gtk.main()
 
-#some handy functions
+def button_callback(args):    #function run on pedal press
+	global pedalPressTime
+	count=0
+	print(f"button pressed!")
+	while (GPIO.input(pedalPin)==1) and (count<(clampTime*100)):
+		count+=1
+		time.sleep(0.01)
+	pedalPressTime = count*0.01
+	print("for ", pedalPressTime, " seconds")
+	pedalUpdateState()
+
+def pedalUpdateState():
+	global pedalPressTime
+	global state
+	if  (pedalPressTime == clampTime)  and (rotorAngle == rotorHome):
+		if state==2:
+			print("execute clamping")
+			clampEngage(True)
+		elif state==4:
+			print("execute un-clamping")
+			clampEngage(False)
+	else:
+		if state==4:
+			clampRotate(pedalRotateDelta)
+		else:
+			print("currently unclamped!")
+
+#some handy functions. make into a class?
+			
+def clampRotate(delta):
+	global state
+	global rotorAngle
+	global prevState
+	prevState = state
+	state = 5
+	notebook.set_current_page(page[state])
+	rotorAngle= (360 if rotorAngle==0 else (rotorAngle+delta))
+	updateDFAngle()
+	sendFrame()
+	status = checkProgress(state, operationWaitTime) #replace with diff wait time
+	state = prevState
+	if status:
+		print("Motion successful")
+		infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle))
+	notebook.set_current_page(page[state])
+
 def failSafe():
 	global state
+	global prevState
+	prevState=state
 	state = 100
 	sendFrame()
 	status = checkProgress(state, operationWaitTime) #replace with diff wait time
@@ -326,17 +355,24 @@ def restartCAN():
 def sendFrame():
 	global dataFrame
 	global state
+	global retryCounter
 	dataFrame[statePos] = state
 	msg = can.Message(arbitration_id=clamp_ID, data=dataFrame, is_extended_id=False)
 	bus.send(msg)	
 	if checkReceive():
 		print("send successfully")
+		retryCounter = 0
 		return
-	else:   #here, implement failsafe detection
-		print("Transmission failed.\nPlease check connections for CAN.\nPress ctr+c to exit\nRestarting CAN..")
+	elif retryCounter <= canRetryLimit:   #here, implement failsafe detection
+		print("Transmission failed.\nRestarting CAN..")
 		restartCAN()
 		print("Retrying transmission")
 		sendFrame()
+		retryCounter = retryCounter + 1 
+	else:
+		print("CANbus Retry counter exceeded!\n Clamp not found.\nPress ctr+c to exit")
+		print("Entering Failsafe mode")
+		failSafe()
 		
 def checkProgress(operation, waitTime = operationWaitTime):
 	msg = bus.recv(waitTime)
@@ -354,9 +390,11 @@ def checkProgress(operation, waitTime = operationWaitTime):
 			failSafe()
 			return 0
 		else:
-			checkProgress(operation,waitTime)
+			print("received wrong acknowledgement: ", list(msg.data)[2] )
+			print("waiting for another acknowledgement...")
+			checkProgress(operation,waitTime)	#wait for another acknowledge signal
 	else:
-		print ("timer expired")#go to failsafe
+		print ("timer expired")	#go to failsafe
 		state = prevState
 		notebook.set_current_page(page[state])
 		failSafe()
@@ -374,55 +412,24 @@ def updateTextBoxes():
 	return True
 	
 
-def button_callback(args):    #function run on pedal press
-	global pedalPressTime
-	count=0
-	print(f"button pressed!")
-	while GPIO.input(pedalPin)==1:
-		count+=1
-		time.sleep(0.01)
-	pedalPressTime = count*0.01
-	print("for ", pedalPressTime, " seconds")
-	pedalUpdateState()
-
-def clampEngage():
+def clampEngage(yes):
 	global state
 	global engaged
 	global prevState
 	prevState=state
-	state = 4
+	state = 4 if yes else 2
 	notebook.set_current_page(4)#loading page
 	sendFrame()
 	status = checkProgress(state, operationWaitTime) #replace with diff wait time
 	#print("Machine clamped") if status else print("clamping failed")#enter failsafe here
 	if status:
-		print("Machine clamped")
-		infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle))
+		print("Machine clamped") if yes else print("Machine Un-clamped")
+		infoBoxClamped.set_text("\nClamp engaged\nRotor at angle"+str(rotorAngle))
 		notebook.set_current_page(page[state])
-		engaged = 1
-
-def clampDisengage():
-	global state
-	global engaged
-	global prevState
-	prevState=state
-	if (rotorAngle==rotorHome):
-		state = 2
-		#notebook.set_current_page(4)#loading page
-		sendFrame()
-		print("at 1")
-		status = checkProgress(state, operationWaitTime) #replace with diff wait time
-		print("at 2")
-		if status:
-			print("Machine Un-clamped")
-			notebook.set_current_page(page[state])
-			engaged=0
-		print("at 3")
-	else:
-		#fix this byatch
-		print("Home the rotor, before unclamping!")
-		infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(rotorAngle)+"\n\nHome the rotor, before unclamping!")
-		#maybe display on failsafe page
+		engaged = 1 if yes else 0
+		return
+	state = prevState
+	notebook.set_current_page(page[state])
 
 def updateDFAngle():
 	global dataFrame
@@ -431,27 +438,6 @@ def updateDFAngle():
 	a-=b
 	dataFrame[angleAPos] = a
 	dataFrame[angleBPos] = b
-def clampRotate():
-	print("execute rotation code here")
-	
-def pedalUpdateState():
-	global pedalPressTime
-	global rotorAngle
-	global state
-	global engaged
-	global dataFrame
-	if  pedalPressTime>1.5 :
-		if state==2:
-			print("execute clamping")
-			clampEngage()
-		elif state==4:
-			print("execute un-clamping")
-			clampDisengage()
-	else:
-		if state==4:
-			clampRotate()
-		else:
-			print("currently unclamped!")
 
 if __name__ == "__main__":
 	try:
