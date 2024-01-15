@@ -371,7 +371,7 @@ def checkReceive(sendState, t = receiveWaitTime):
 				return True
 		else:
 			print("wrong length reply")
-			return checkReceive(sendState, t)
+			checkReceive(sendState, t)
 	return False
 
 def sendFrame():
@@ -423,7 +423,10 @@ def checkProgress(operation, waitTime = operationWaitTime):
 		if (status == operation + 10):    #success code of each operation/state is (10 + state)
 			return 1
 		elif (status == 110):
-			print("Clamp entered failsafe")
+			print("Failed" + activity[operation])#enter failsafe here
+			state = prevState
+			notebook.set_current_page(page[state])
+			failSafe()
 			return 0
 		else:
 			print("received wrong acknowledgement: "+ str(status) )
@@ -431,13 +434,13 @@ def checkProgress(operation, waitTime = operationWaitTime):
 			#checkProgress(operation,waitTime)	#wait for another acknowledge signal
 			print("Sending again..")
 			sendFrame()
-			return checkProgress(operation)
+			return checkProgress(state)
 			
 	else: #add retry counter here and mtrigger failsafe
 		print ("timer expired. No progress reported by Clamp.")	#go to failsafe
 		print("Sending again..")
 		sendFrame()
-		return checkProgress(operation)
+		return checkProgress(state)
 
 def updateTextBoxes():
 	global engaged
@@ -466,7 +469,7 @@ def clampEngage(yes):
 		return
 	state = prevState
 	notebook.set_current_page(page[state])
-	#time.sleep(0.5)
+	time.sleep(0.5)
 
 
 if __name__ == "__main__":
