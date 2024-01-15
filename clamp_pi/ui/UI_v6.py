@@ -70,6 +70,7 @@ angleBPos = 5
 
 #global variables
 pedalPressTime=0.0
+debounceTime = 0.5
 state = 0
 prevState = 0
 rotorAngle = 0
@@ -136,7 +137,7 @@ class Handler:
 		
 		#switch to un-clamped state
 		print("Unclamping")
-		clampEngage(True)
+		clampEngage(False)
 	
 	def onButtonPressOff(self, button):
 		global state
@@ -255,14 +256,17 @@ def button_callback(args):    #function run on pedal press
 		time.sleep(0.01)
 	pedalPressTime = count*0.01
 	print("for ", pedalPressTime, " seconds")
-	pedalUpdateState()
+	time.sleep(debounceTime)
+	#pedalUpdateState()
 
 def pedalUpdateState():
+	
 	global pedalPressTime
 	global state
 	global rotorDirection
 	#if  (pedalPressTime == clampTime)  and (rotorAngle == rotorHome):
 	if  (pedalPressTime == clampTime):
+		print("pedal triggered")
 		if state==2:
 			print("Clamping..")
 			clampEngage(True)
@@ -271,9 +275,11 @@ def pedalUpdateState():
 			homeRotor()
 			print("Un-clamping..")
 			clampEngage(False)
-	else:
+		pedalPressTime=0
+		
+	elif pedalPressTime>0:
+		print("pedal triggered")
 		if state==4:
-			
 			if rotorAngle == 0 or rotorAngle == 360:
 				rotorDirection = rotorDirection * -1
 				print("Limit reached. Switching Direction..")
@@ -281,6 +287,8 @@ def pedalUpdateState():
 			clampRotate(pedalRotateDelta * rotorDirection)
 		else:
 			print("currently unclamped!")
+		pedalPressTime=0
+	return True
 
 #some handy functions. make into a class?
 def homeRotor():
@@ -441,7 +449,6 @@ def updateTextBoxes():
 	statusBoxOn.set_text("Machine is in state "+stateName[state]+"\nRotor at angle"+str(rotorAngle))
 	statusBoxOff.set_text("Machine is in state "+stateName[state]+"\nRotor at angle"+str(rotorAngle))
 	#infoBoxClamped.set_text("Machine is in state "+str(state)+"\nClamp in state "+str(engaged)+"\nRotor at angle"+str(rotorAngle))
-	
 	loadingBox.set_text(activity[state]+"\n\nPlease wait..")
 	return True
 	
@@ -454,8 +461,6 @@ def clampEngage(yes):
 	state = 4 if yes else 2
 	notebook.set_current_page(4)#loading page
 	status = sendFrame()
-	#status = checkProgress(state, clampWaitTime) #replace with diff wait time
-	#print("Machine clamped") if status else print("clamping failed")#enter failsafe here
 	if status:
 		print("Machine clamped") if yes else print("Machine Un-clamped")
 		infoBoxClamped.set_text("\nClamp engaged\nRotor at angle"+str(rotorAngle))
@@ -464,11 +469,13 @@ def clampEngage(yes):
 		return
 	state = prevState
 	notebook.set_current_page(page[state])
+	time.sleep(0.5)
 
 
 if __name__ == "__main__":
 	try:
 		GLib.timeout_add(200, updateTextBoxes)     #adds function to gtk main loop
+		GLib.timeout_add(200, pedalUpdateState)
 		main()
 	except KeyboardInterrupt:
 		print("Execute GPIO-cleanup")
