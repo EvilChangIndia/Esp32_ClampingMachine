@@ -121,7 +121,7 @@ class UIHandler:
 
 	def onButtonPressClamp(self, button):
 		print("clamp button pressed")
-		self.addText ="Device clamped"
+		self.addText =""
 		if not clamp1.clampEngage(True):
 			#failsafe
 			print("Clamping failed")
@@ -140,12 +140,12 @@ class UIHandler:
 
 	def onButtonPressCW(self, button):
 		print("Roate CW button pressed")
-		self.addText ="Rotating clockwise..."
+		self.addText =""
 		clamp1.clampRotate(pedalRotateDelta)
 		
 	def onButtonPressACW(self, button):
 		print("Rotate ACW button pressed")
-		self.addText ="Rotating anti-clockwise..."
+		self.addText =""
 		clamp1.clampRotate(-pedalRotateDelta)
 		
 	def onButtonPressHome(self, button):
@@ -181,6 +181,7 @@ class UIHandler:
 		
 	def onButtonPressFailSafe(self, button):
 		print("Failsafe button pressed")
+		self.addText =""
 		clamp1.failSafe()
 		#notebook.set_current_page(page[clamp1.state])
 	
