@@ -12,7 +12,7 @@ from subprocess import call
 from tabnanny import check
 from xml.sax.handler import property_declaration_handler
 import RPi.GPIO as GPIO 
-from threading import Thread
+import threading
 import time
 import can
 from debounce import ButtonHandler
@@ -22,13 +22,13 @@ from gi.repository import Gtk               # Include the python bindings for GT
 from gi.repository import GLib              # included for adding things to gtk main loop
 
 
-#GPIO pinout for pedal input
+#GPIO pinout
 pedalPin = 16
 GPIO.setmode(GPIO.BCM)
 GPIO.setup(pedalPin, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
 
 #import UI glade file into a GTK.Builder object
-gladeFile = "UI_v4.glade"      #gladeFile holding the UI XML file. maybe give full path
+gladeFile = "UI_v4.glade"      # Variable gladeFile holding the XML file path 
 builder = Gtk.Builder()            # GTK Builder called 
 builder.add_from_file(gladeFile)   # GTK Builder passed the XML file path for translation
 
@@ -47,15 +47,15 @@ loadingBox = builder.get_object("loadingBox").get_buffer()
 
 #pages are (0-exit page 1-offpage 2-unclamped page 3-clamped page 4-loading page)
 #define pages 
-page = {100:5, 0:1, 1:4, 2:2, 3:4, 4:3, 5:4, 20:4 }		#{state:corresponding page number}
+page = {100:5, 0:1, 1:4, 2:2, 3:4, 4:3, 5:4 }		#{state:corresponding page number}
 currentPage = 0
 
 
 #actions
-activity={100:"Entering Failsafe", 0:"Turning the machine OFF...", 1:"Turning the machine ON...", 2:"Un-Clamping...", 3:"Calibrating the rotor", 4:"Clamping...", 5:"Rotor in motion...", 20:"Waiting for machine to turn on"}
+activity={100:"Entering Failsafe", 0:"Turning the machine OFF...", 1:"Turning the machine ON...", 2:"Un-Clamping...", 3:"Calibrating the rotor", 4:"Clamping...", 5:"Rotor in motion..."}
 
 #state names 
-stateName={0:"OFF", 1:"ON", 2:"Un-Clamped", 3:"Calibrating", 4:"Clamped", 5:"Angle Update", 6:"Stepper Run", 100:"FailSafe", 20: "Not ready!"}
+stateName={0:"OFF", 1:"ON", 2:"Un-Clamped", 3:"Calibrating", 4:"Clamped", 5:"Angle Update", 6:"Stepper Run", 100:"FailSafe"}
 
 #CAN ID of clamp esp
 clamp_ID = 0x7D0      #address of clamp ESP set to 2000
@@ -63,7 +63,7 @@ clamp_ID = 0x7D0      #address of clamp ESP set to 2000
 #global variables
 pedalPressTime=0.0
 debounceTime = 0.5
-clampTriggerTime = 1   #pedal press time for triggering pneumatic clamping in seconds
+clampTime = 1   #predal press time for triggering pneumatic clamping in seconds
 
 rotorDirection = 1
 pedalRotateDelta = 90
@@ -75,8 +75,7 @@ pedalRotateDelta = 90
 class UIHandler:
 	#onDestroy triggers. can use just one onDestroy 
 	autoPageChange = 1
-	addTextClamped = ""
-	addTextOn = ""
+	addText = ""
 	def onDestroy(self, *args):
 		print("Destroy triggered")
 		Gtk.main_quit()
@@ -122,8 +121,7 @@ class UIHandler:
 
 	def onButtonPressClamp(self, button):
 		print("clamp button pressed")
-		self.addTextClamped =""
-		self.addTextOn=""
+		self.addText =""
 		if not clamp1.clampEngage(True):
 			#failsafe
 			print("Clamping failed")
@@ -131,30 +129,28 @@ class UIHandler:
 	
 	def onButtonPressUnclamp(self, button):
 		print("un-clamp button pressed")
-		self.addTextClamped =""
-		self.addTextOn=""
 		if (clamp1.rotorAngle % 360== clamp1.rotorHome):
 			if not clamp1.clampEngage(False):
 				#failsafe
 				print("Un-Clamping failed")
 		else:
-			print("Home the rotor, before unclamping!\n\nLong-press pedal to UN-CLAMP")
-			self.addTextClamped ="Home the rotor, before Un-clamping!"
+			print("Home the rotor, before unclamping!")
+			self.addText ="Home the rotor, before Un-clamping!"
 		#notebook.set_current_page(page[clamp1.state])
 
 	def onButtonPressCW(self, button):
-		print("Rotate CW button pressed")
-		self.addTextClamped =""
+		print("Roate CW button pressed")
+		self.addText =""
 		clamp1.clampRotate(pedalRotateDelta)
 		
 	def onButtonPressACW(self, button):
 		print("Rotate ACW button pressed")
-		self.addTextClamped =""
+		self.addText =""
 		clamp1.clampRotate(-pedalRotateDelta)
 		
 	def onButtonPressHome(self, button):
 		print("Home button pressed")
-		self.addTextClamped =""
+		self.addText =""
 		if clamp1.homeRotor():
 			print("Homed rotor successfully!")
 		else: 
@@ -165,27 +161,27 @@ class UIHandler:
 		print("Calibrate button pressed")
 		if clamp1.calibrateRotor():
 			print("Calibration successful")
-			self.addTextClamped ="Calibration successful"
+			self.addText ="Calibration successful"
 			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(clamp1.rotorAngle)+"\n\nCalibration Successful")
 		else:
 			print("Calibration failed")
-			self.addTextClamped ="Calibration failed. See logs for debugging..."
+			self.addText ="Calibration failed. See logs for debugging..."
 			#add failsafe?
 
 	def onButtonPressCalibrateClamped(self, button):
 		print("Calibrate button pressed")
 		if clamp1.calibrateRotor():
 			print("Calibration successful")
-			self.addTextClamped ="Calibration successful"
+			self.addText ="Calibration successful"
 			infoBoxClamped.set_text("\nClamp engaged"+"\nRotor at angle"+str(clamp1.rotorAngle)+"\n\nCalibration Successful")
 		else:
 			print("Calibration failed")
-			self.addTextClamped ="Calibration failed. See logs for debugging..."
+			self.addText ="Calibration failed. See logs for debugging..."
 			#add failsafe?
 		
 	def onButtonPressFailSafe(self, button):
 		print("Failsafe button pressed")
-		self.addTextClamped =""
+		self.addText =""
 		clamp1.failSafe()
 		#notebook.set_current_page(page[clamp1.state])
 	
@@ -221,19 +217,9 @@ class Clamp:
 		self.bustype = 'socketcan'
 		self.channel = 'can0'
 
-	def startupRoutine(self):
-		print("Turning machine to state OFF")
-		while self.state==20:
-			print("Waiting for device to startup...")
-			self.turnOff()
-			print("Current state= ",self.state)
-			time.sleep(2)
-		print("Machine switched to OFF state") 
-		return
-
 	def turnOn(self):
 		self.prevState = self.state
-		print("Trying to turn machine ON")
+		print("on button pressed")
 		#turn machine on
 		self.state = 1
 		self.sendFrame()
@@ -253,7 +239,7 @@ class Clamp:
 
 	def turnOff(self):
 		self.prevState=self.state
-		print("Trying to turn machine OFF")
+		print("Off button pressed")
 		self.state = 0
 		#notebook.set_current_page(4)#loading page
 		self.sendFrame()
@@ -292,20 +278,21 @@ class Clamp:
 					return True
 			else:
 				print("wrong length reply")
-				return self.checkReceive(sendState, t)	
-		return False
+				return self.checkReceive(sendState, t)
+		return False	
+	
 	def checkProgress(self, operation, waitTime = progressWaitTime):
-		print("checking progress..")
+		print("checking progress")
 		msg = self.bus.recv(waitTime)
 		if (msg!=None): 
 			#use match case here
 			statusLength = len(list(msg.data))
-			#print("received progress report of length", str(statusLength))
-			if  statusLength < 3: #correct is length 6
+			print("received progress report of length", str(statusLength))
+			if  statusLength < 3:
 				print("received wrong acknowledgement: "+ str(status) )
 				print("Sending again..")
 				self.sendFrame()
-				return self.checkProgress(operation, waitTime)
+				return self.checkProgress(operation)
 			status=list(msg.data)[self.progressPos]
 			print("received reply: ", status)
 			if (status == operation + 10):    #success code of each operation/state is (10 + state)
@@ -313,20 +300,12 @@ class Clamp:
 				return 1
 			elif (status == 110):
 				print("Clamp entered Failsafe")#enter failsafe here
-				self.prevState=self.state
-				self.state = 100
 				return 0
-			elif self.prevState==20:
-				print("Clamp is probably switched OFF..")
-				self.prevState=self.state
-				self.state = 20
-				return 0
-			
 			else:
 				print("Received wrong acknowledgement: "+ str(status) )
 				print("Sending again..")
 				self.sendFrame()
-				return self.checkProgress(operation,waitTime)
+				return self.checkProgress(operation)
 
 		else: #add retry counter here and mtrigger failsafe
 			print ("timer expired. No progress reported by Clamp.")	#go to failsafe
@@ -341,7 +320,7 @@ class Clamp:
 		self.dataFrame[self.angleAPos] = a
 		self.dataFrame[self.angleBPos] = b
 		self.dataFrame[self.statePos] = self.state
-		print("Trying to send: state: "+str(self.state) + " Angle: " + str(self.rotorAngle))
+		print("Trying to send: state: "+str(self.state) + " Angle:" + str(self.rotorAngle))
 		msg = can.Message(arbitration_id = self.clampID, data = self.dataFrame, is_extended_id = False)
 		self.bus.send(msg)	
 		if self.checkReceive(self.state):
@@ -349,11 +328,6 @@ class Clamp:
 			self.retryCounter = 0
 			return 1
 		elif self.retryCounter <= self.canRetryLimit:   #here, implement failsafe detection
-			if self.prevState==20:
-				print("Device not up yet..")
-				time.sleep(2)
-				print("Retrying transmission")
-				return self.sendFrame()
 			print("Transmission failed.\nRestarting CAN..")
 			self.restartCAN()
 			print("Retrying transmission")
@@ -452,7 +426,7 @@ def button_callback(args):    #function run on pedal press
 	global pedalPressTime
 	count=0
 	print(f"Pedal pressed!")
-	while (GPIO.input(pedalPin)==1) and (count<(clampTriggerTime*100)):
+	while (GPIO.input(pedalPin)==1) and (count<(clampTime*100)):
 		count+=1
 		time.sleep(0.01)
 	pedalPressTime = count*0.01
@@ -463,11 +437,9 @@ def button_callback(args):    #function run on pedal press
 def pedalUpdateState():
 	global pedalPressTime
 	global rotorDirection
-	#if  (pedalPressTime == clampTriggerTime)  and (rotorAngle == rotorHome):
-	if  (pedalPressTime == clampTriggerTime):
-		print("pedal long-press triggered")
-		clampUI.addTextOn=""
-		clampUI.addTextClamped =""
+	#if  (pedalPressTime == clampTime)  and (rotorAngle == rotorHome):
+	if  (pedalPressTime == clampTime):
+		print("pedal triggered")
 		if clamp1.state==2:
 			print("Clamping..")
 			clamp1.clampEngage(True)
@@ -480,9 +452,7 @@ def pedalUpdateState():
 		
 	elif pedalPressTime>0:
 		print("pedal triggered")
-		
 		if clamp1.state==4:
-			clampUI.addTextClamped ="\nShort-press pedal to ROTATE\n\nLong-press pedal to UN-CLAMP"
 			if clamp1.rotorAngle == 0 or clamp1.rotorAngle == 360:
 				rotorDirection = rotorDirection * -1
 				print("Limit reached. Switching Direction..")
@@ -490,17 +460,15 @@ def pedalUpdateState():
 			clamp1.clampRotate(pedalRotateDelta * rotorDirection)
 		else:
 			print("currently unclamped!")
-			clampUI.addTextOn ="\nEngage clamp before rotating!\n\nLong-press pedal to CLAMP"
 		pedalPressTime=0
 	return True
 
 def updateTextBoxes():
 	timeBoxOn.set_text(time.strftime('%H:%M:%S'))
 	timeBoxOff.set_text(time.strftime('%H:%M:%S'))
-	statusBoxOn.set_text("Machine is in state "+stateName[clamp1.state]+"\nRotor at angle: "+str(clamp1.rotorAngle)+"°")
-	statusBoxOff.set_text("Machine is in state "+stateName[clamp1.state]+"\nRotor at angle: "+str(clamp1.rotorAngle)+"°")
-	infoBoxClamped.set_text("Machine is in state "+stateName[clamp1.state]+"\nRotor at angle: "+str(clamp1.rotorAngle)+"°"+"\n\n"+clampUI.addTextClamped)
-	infoBoxOn.set_text(clampUI.addTextOn)
+	statusBoxOn.set_text("Machine is in state "+stateName[clamp1.state]+"\nRotor at angle"+str(clamp1.rotorAngle))
+	statusBoxOff.set_text("Machine is in state "+stateName[clamp1.state]+"\nRotor at angle"+str(clamp1.rotorAngle))
+	infoBoxClamped.set_text("Machine is in state "+stateName[clamp1.state]+"\nRotor at angle"+str(clamp1.rotorAngle)+"\n"+clampUI.addText)
 	loadingBox.set_text(activity[clamp1.state]+"\n\nPlease wait..")
 	return True
 
@@ -513,6 +481,10 @@ def updatePage():
 def main():
 	
 	clamp1.restartCAN()
+	#set machine state to off
+	print("Turning machine off")
+	status = clamp1.turnOff()
+	print("Machine switched to OFF state") if status else print("Operation failed")
 	#connect the callbacks from glade file widgets
 	builder.connect_signals(clampUI)
 	#set starting page to offPage
@@ -524,15 +496,7 @@ def main():
 	#start the button handler thread for pedal press
 	pedal = ButtonHandler(pedalPin, GPIO.RISING, button_callback,0.1)
 	#initiate the gtk main loop
-	clamp1.state = 20
-	#run clamp startup routine
-	clamp1.startupRoutine()
-	# create a thread
-	#thread = Thread(target=clamp1.startupRoutine())
-	# run the thread
-	#thread.start()
 	Gtk.main()
-	
 
 if __name__ == "__main__":
 	try:
@@ -543,6 +507,6 @@ if __name__ == "__main__":
 	except KeyboardInterrupt:
 		print("Execute GPIO-cleanup")
 		GPIO.cleanup()
-	#finally:
-	#	print("Execute GPIO-cleanup")
-	#	GPIO.cleanup()
+	finally:
+		print("Execute GPIO-cleanup")
+		GPIO.cleanup()

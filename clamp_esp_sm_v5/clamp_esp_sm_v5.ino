@@ -40,7 +40,7 @@ const int posPerRev = 1600;          //for 1/8 micro stepping
 const int gearRatio = 38;           //of the wormgear
 const int maxVelocity = posPerRev*5;    //make it multiples of posPerRev
 const int acceleration = maxVelocity/2;  //worked better this way. Will affect postioning accuracy
-const int jogVelocity = 800;              //velocity at which myStepper.runSpeed() will move the rotor
+const int jogVelocity = 800;              //velocity at which rotorStepper.runSpeed() will move the rotor
 const int sweepRange=10;
 const int calibRevs = 2;
 const int clampTriggerTime = 300; //time to trigger clamping in milli-seconds
@@ -69,7 +69,7 @@ int state=0;
 int errorCode=0;
 
 //Make instances for CAN bus & stepper
-AccelStepper myStepper(motorInterfaceType, stepPin, dirPin);
+AccelStepper rotorStepper(motorInterfaceType, stepPin, dirPin);
 CanBusMCP2515_asukiaaa::Driver can(PIN_CS, PIN_INT, PIN_RST);
 CanBusMCP2515_asukiaaa::Settings settings(QUARTZ_FREQUENCY, BITRATE);
 CanBusData_asukiaaa::Frame frame;
@@ -77,9 +77,9 @@ CanBusData_asukiaaa::Frame frame;
 void setup() {
   //for stepper
   pinMode(enPin, OUTPUT);
-  myStepper.setMaxSpeed(maxVelocity);
-	myStepper.setAcceleration(acceleration);
-	myStepper.setSpeed(jogVelocity);
+  rotorStepper.setMaxSpeed(maxVelocity);
+	rotorStepper.setAcceleration(acceleration);
+	rotorStepper.setSpeed(jogVelocity);
   //for endstop
   pinMode(endStopVcc, OUTPUT);
   pinMode(endStop, INPUT);
@@ -146,8 +146,8 @@ void setRotor(int a)  {
   Serial.print("Setting rotor to angle ");
   Serial.println(a);
   targetPosition = (posPerRev * a * gearRatio/360.0);
-  myStepper.moveTo(targetPosition);
-  myStepper.runToPosition();
+  rotorStepper.moveTo(targetPosition);
+  rotorStepper.runToPosition();
   return;
 }
 
@@ -157,28 +157,28 @@ void calibrateRotor()
 { 
   calibrated=0;
   Serial.println ("\nCalibrating Rotor");
-  myStepper.move(posPerRev * calibRevs * gearRatio);
+  rotorStepper.move(posPerRev * calibRevs * gearRatio);
   int endStopRead = digitalRead(endStop);
-  while(myStepper.distanceToGo() != 0)  {
-    myStepper.run();
+  while(rotorStepper.distanceToGo() != 0)  {
+    rotorStepper.run();
     delayMicroseconds(5);
     if (digitalRead(endStop)) {
       endStopRead = 1;
-      home = myStepper.currentPosition()+100; //if home is found
+      home = rotorStepper.currentPosition()+100; //if home is found
       Serial.print ("\nHome found at : ");
       Serial.println (home);
       calibrated=1;
-      myStepper.stop();
-      myStepper.runToPosition();  //calls run() until motor comes to stop
+      rotorStepper.stop();
+      rotorStepper.runToPosition();  //calls run() until motor comes to stop
       Serial.println ("\nReturning Home");
-      myStepper.moveTo(home);
-      myStepper.runToPosition();  //calls run() until motor reaches the target (home)
+      rotorStepper.moveTo(home);
+      rotorStepper.runToPosition();  //calls run() until motor reaches the target (home)
     }
   }
   if (calibrated)  {   //if home is found,
     Serial.println ("\nApplying changes..");
     home = posPerRev * homeAngle * gearRatio/360.0;
-    myStepper.setCurrentPosition(home);
+    rotorStepper.setCurrentPosition(home);
     Serial.println ("\nRotor Calibration Successful!");
     microCalib=1;
     canSend(2,13);
@@ -198,10 +198,10 @@ void calibrateRotor()
 //used by quick re-calibaration function
 void sweepRotor(int direction=1, int sweep=20) 
 {
-  myStepper.move(posPerRev * direction * sweep * gearRatio/360);
+  rotorStepper.move(posPerRev * direction * sweep * gearRatio/360);
   int endStopRead = digitalRead(endStop);
-  while(endStopRead==0 && myStepper.distanceToGo() != 0)  {
-    myStepper.run();
+  while(endStopRead==0 && rotorStepper.distanceToGo() != 0)  {
+    rotorStepper.run();
     delayMicroseconds(10);
     endStopRead = digitalRead(endStop);
   }  
@@ -226,7 +226,7 @@ void microCalibrateRotor()
   }
   if (microCalib){
     Serial.println("micro-calibrated.");
-    myStepper.setCurrentPosition((posPerRev * homeAngle * gearRatio/360.0));
+    rotorStepper.setCurrentPosition((posPerRev * homeAngle * gearRatio/360.0));
     calibrated=1;
     canSend(2,13);
     //send rotor back to angle before calibration
@@ -320,7 +320,7 @@ bool canSend(int i, int val)
 
 
 //THE MAIN LOOP
-//myStepper.run() has to be called repeatedly in this loop for the library to work
+//rotorStepper.run() has to be called repeatedly in this loop for the library to work
 //machine states:-   100: FailSafe   0: OFF   1: ON   2: Unclamped    3: Calibration    4: Clamped    5: Update Angle   6:Stepper Run   
 //frame send to master : {state, ack, status, 0, angle1, angle2, 0, 0}
 //state: current state
@@ -382,9 +382,9 @@ void loop()
       Serial.print("\nCurrent angle: ");
       Serial.print(prevAngle);
       targetPosition = (posPerRev * angle * gearRatio/360.0);
-      if (prevAngle == 360 && angle <= 180)  myStepper.setCurrentPosition(0);
-      if (prevAngle == 0 && angle >= 180)  myStepper.setCurrentPosition(posPerRev * gearRatio);
-      myStepper.moveTo(targetPosition);
+      if (prevAngle == 360 && angle <= 180)  rotorStepper.setCurrentPosition(0);
+      if (prevAngle == 0 && angle >= 180)  rotorStepper.setCurrentPosition(posPerRev * gearRatio);
+      rotorStepper.moveTo(targetPosition);
       Serial.print("\nSetting target angle to : ");
       Serial.println(angle);
       state=6;
@@ -392,8 +392,8 @@ void loop()
     case 6: //Stepper-rotation state
       int f=0;
       while (!canReceive()) {
-        myStepper.run();
-        if (myStepper.distanceToGo()==0 && f==0) {
+        rotorStepper.run();
+        if (rotorStepper.distanceToGo()==0 && f==0) {
           f=1;
           Serial.println("motion completed");
           bool i=canSend(2,15);
