@@ -17,7 +17,7 @@ Welcome to my Object Clamping and Rotation Robot project! This repository contai
 ## Installation
 1. Clone the repository into your PC:
    ```
-   git clone https://github.com/EvilChangIndia/Esp32_ClampingMachine
+   git clone https://github.com/EvilChangIndia/Esp32_ClampingMachine.git
    ```
 2. Use arduino IDE to upload the **clamp_esp_sm_v4.ino** firmware into the ESP32. The file is inside the folder with the same name.
 3. Copy the "clamp_pi" folder into the raspberry pi home folder. 
