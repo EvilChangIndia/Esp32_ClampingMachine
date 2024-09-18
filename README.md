@@ -7,9 +7,6 @@ Welcome to my Object Clamping and Rotation Robot project! This repository contai
 - Hardware Setup
 - Installation
 - Usage
-- Contributing
-- License
-- Contact
 
 ## Hardware Setup
 - Controller: Esp32 Nodemcu
